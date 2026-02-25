@@ -48,26 +48,23 @@ Repeat
 
 ---
 
-## Non-Negotiables (Customize These)
+## Non-Negotiables
 
-<!-- Replace with YOUR project's locked-in preferences -->
-
-- [YOUR PATH CONVENTION] (e.g., `here::here()` for R, relative paths for LaTeX)
-- [YOUR SEED CONVENTION] (e.g., `set.seed()` once at top for stochastic code)
-- [YOUR FIGURE STANDARDS] (e.g., white bg, 300 DPI, custom theme)
-- [YOUR COLOR PALETTE] (e.g., institutional colors)
-- [YOUR TOLERANCE THRESHOLDS] (e.g., 1e-6 for point estimates)
+- **Paths:** `here::here()` for all R file paths; relative paths for LaTeX
+- **Seeds:** `set.seed(YYYYMMDD)` once at top of every stochastic script
+- **Color palette:** Okabe-Ito colorblind-friendly (see `r-code-conventions.md`)
+- **Figures:** Publication-ready — 300 DPI, white background, `.pdf` for papers / `.png` for web
+- **Figure theme:** `theme_publication()` with consistent fonts and sizing
+- **Tolerances:** 1e-6 for point estimates; 1e-3 for standard errors
 
 ---
 
 ## Preferences
 
-<!-- Fill in as you discover your working style -->
-
-**Visual:** [How you want figures/plots handled]
-**Reporting:** [Concise bullets? Detailed prose? Details on request?]
-**Session logs:** Always (post-plan, incremental, end-of-session)
-**Replication:** [How strict? Flag near-misses?]
+**Visual:** Polished, publication-ready. Clean axis labels, no chartjunk, colorblind-safe.
+**Reporting:** Concise bullets; detail on request.
+**Session logs:** Always (post-plan, incremental, end-of-session).
+**Replication:** Strict — flag near-misses, never silently round.
 
 ---
 

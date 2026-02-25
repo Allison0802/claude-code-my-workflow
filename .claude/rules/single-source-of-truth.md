@@ -1,9 +1,12 @@
 ---
 paths:
-  - "Figures/**/*"
-  - "Quarto/**/*.qmd"
-  - "Slides/**/*.tex"
+  - "Figures_DORMANT/**/*"
+  - "Quarto_DORMANT/**/*.qmd"
+  - "Slides_DORMANT/**/*.tex"
 ---
+
+<!-- DORMANT: This Beamer/Quarto SSOT rule is preserved for future use (defense slides, job talk).
+     It does not trigger on any current files. To reactivate, restore original paths. -->
 
 # Single Source of Truth: Enforcement Protocol
 

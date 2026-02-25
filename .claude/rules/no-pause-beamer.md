@@ -1,7 +1,10 @@
 ---
 paths:
-  - "Slides/**/*.tex"
+  - "Slides_DORMANT/**/*.tex"
 ---
+
+<!-- DORMANT: Preserved for future use (defense slides, job talk).
+     To reactivate, change path back to "Slides/**/*.tex". -->
 
 # No \pause in Beamer Slides
 

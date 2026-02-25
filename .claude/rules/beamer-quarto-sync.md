@@ -1,8 +1,12 @@
 ---
 paths:
-  - "Slides/**/*.tex"
-  - "Quarto/**/*.qmd"
+  - "Slides_DORMANT/**/*.tex"
+  - "Quarto_DORMANT/**/*.qmd"
 ---
+
+<!-- DORMANT: This rule is preserved for future use (defense slides, job talk).
+     It does not trigger on any current files. To reactivate, change paths back to
+     "Slides/**/*.tex" and "Quarto/**/*.qmd". -->
 
 # Beamer → Quarto Auto-Sync Rule (MANDATORY)
 

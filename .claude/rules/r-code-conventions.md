@@ -3,6 +3,8 @@ paths:
   - "**/*.R"
   - "Figures/**/*.R"
   - "scripts/**/*.R"
+  - "comparisons/**/*.R"
+  - "Missing Types/**/*.R"
 ---
 
 # R Code Standards
@@ -15,7 +17,7 @@ paths:
 
 - `set.seed()` called ONCE at top (YYYYMMDD format)
 - All packages loaded at top via `library()` (not `require()`)
-- All paths relative to repository root
+- All paths via `here::here()` — never hardcoded absolute paths
 - `dir.create(..., recursive = TRUE)` for output directories
 
 ## 2. Function Design
@@ -27,52 +29,73 @@ paths:
 
 ## 3. Domain Correctness
 
-<!-- Customize for your field's known pitfalls -->
-- Verify estimator implementations match slide formulas
+- Verify estimator implementations match paper formulas
+- Pseudo-observation calculations: check for ties, censoring edge cases
+- Subject-level bootstrap: resample subjects, not individual observations
+- Competing risks: verify cause-specific vs. subdistribution hazard intent
 - Check known package bugs (document below in Common Pitfalls)
 
 ## 4. Visual Identity
 
 ```r
-# --- Your institutional palette ---
-primary_blue  <- "#012169"
-primary_gold  <- "#f2a900"
-accent_gray   <- "#525252"
-positive_green <- "#15803d"
-negative_red  <- "#b91c1c"
+# --- Okabe-Ito colorblind-friendly palette ---
+okabe_ito <- c(
+  orange    = "#E69F00",
+  sky_blue  = "#56B4E9",
+  green     = "#009E73",
+  yellow    = "#F0E442",
+  blue      = "#0072B2",
+  vermilion = "#D55E00",
+  purple    = "#CC79A7",
+  black     = "#000000"
+)
+
+# Semantic assignments
+color_primary   <- okabe_ito["blue"]      # #0072B2
+color_secondary <- okabe_ito["vermilion"]  # #D55E00
+color_tertiary  <- okabe_ito["green"]      # #009E73
+color_accent    <- okabe_ito["orange"]     # #E69F00
+color_neutral   <- "#525252"
 ```
 
 ### Custom Theme
 ```r
-theme_custom <- function(base_size = 14) {
+theme_publication <- function(base_size = 12) {
   theme_minimal(base_size = base_size) +
     theme(
-      plot.title = element_text(face = "bold", color = primary_blue),
-      legend.position = "bottom"
+      plot.title = element_text(face = "bold", size = base_size + 2),
+      axis.title = element_text(size = base_size),
+      legend.position = "bottom",
+      panel.grid.minor = element_blank(),
+      strip.text = element_text(face = "bold")
     )
 }
 ```
 
-### Figure Dimensions for Beamer
+### Figure Dimensions for Papers
 ```r
-ggsave(filepath, width = 12, height = 5, bg = "transparent")
+ggsave(filepath, width = 7, height = 5, dpi = 300, bg = "white")
 ```
 
 ## 5. RDS Data Pattern
 
-**Heavy computations saved as RDS; slide rendering loads pre-computed data.**
+**Heavy computations saved as RDS; papers/analysis loads pre-computed data.**
 
 ```r
-saveRDS(result, file.path(out_dir, "descriptive_name.rds"))
+saveRDS(result, here::here(out_dir, "descriptive_name.rds"))
 ```
 
 ## 6. Common Pitfalls
 
-<!-- Add your field-specific pitfalls here -->
 | Pitfall | Impact | Prevention |
 |---------|--------|------------|
-| Missing `bg = "transparent"` | White boxes on slides | Always include in ggsave() |
-| Hardcoded paths | Breaks on other machines | Use relative paths |
+| `bg = "transparent"` in papers | Invisible on white PDF pages | Use `bg = "white"` for all paper figures |
+| Hardcoded paths | Breaks on other machines | Use `here::here()` |
+| Bootstrap resampling rows not subjects | Underestimates variance for recurrent events | Resample at subject level: `unique(id)` then filter |
+| `pseudo()` with heavy censoring | Biased pseudo-observations | Check censoring distribution; consider IPCW |
+| `coxph()` with time-varying covariates | Silent misspecification | Verify `tstart`/`tstop` intervals don't overlap |
+| `survfit()` competing risks | Wrong estimator if cause not specified | Explicitly set `type` and verify cause coding |
+| Ignoring tied event times | Biased Nelson-Aalen estimates | Use Efron or exact method; document choice |
 
 ## 7. Line Length & Mathematical Exceptions
 
@@ -96,10 +119,11 @@ saveRDS(result, file.path(out_dir, "descriptive_name.rds"))
 
 ```
 [ ] Packages at top via library()
-[ ] set.seed() once at top
-[ ] All paths relative
+[ ] set.seed() once at top (YYYYMMDD)
+[ ] All paths via here::here()
 [ ] Functions documented (Roxygen)
-[ ] Figures: transparent bg, explicit dimensions
+[ ] Figures: white bg, 300 DPI, explicit dimensions
 [ ] RDS: every computed object saved
 [ ] Comments explain WHY not WHAT
+[ ] Subject-level resampling for bootstrap
 ```

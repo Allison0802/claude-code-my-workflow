@@ -1,8 +1,12 @@
 ---
 paths:
-  - "Slides/**/*.tex"
-  - "Figures/**/*.tex"
+  - "Slides_DORMANT/**/*.tex"
+  - "Papers/**/*.tex"
 ---
+
+<!-- SEMI-DORMANT: Slide paths are dormant. Papers/**/*.tex is active in case TikZ
+     diagrams are used in manuscripts. To fully reactivate for slides, restore
+     "Slides/**/*.tex" and "Figures/**/*.tex". -->
 
 # TikZ Visual Quality Standards
 
