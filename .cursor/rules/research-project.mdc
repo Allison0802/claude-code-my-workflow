@@ -1,0 +1,78 @@
+---
+description: PhD dissertation project context, principles, and folder structure
+alwaysApply: true
+---
+
+# Research Project — ML for Recurrent Events
+
+**Project:** ML Methods for Recurrent Events with Multiple Types
+**Institution:** UNC Chapel Hill | **Branch:** main
+
+## Core Principles
+
+- **Plan first** — enter plan mode before non-trivial tasks; save plans to `quality_reports/plans/`
+- **Verify after** — compile/render and confirm output at the end of every task
+- **Reproducibility** — `set.seed(YYYYMMDD)`, `here::here()` paths, all results replicable
+- **Quality gates** — nothing ships below 80/100
+- **[LEARN] tags** — when corrected, save `[LEARN:category] wrong → right` to MEMORY.md
+
+## Folder Structure
+
+```
+Research/
+├── CLAUDE.MD                    # Project guidance
+├── .claude/                     # Rules, skills, agents
+├── Bibliography_base.bib       # Centralized bibliography
+├── Figures/                     # Shared figures
+├── Papers/                      # LaTeX manuscript chapters
+├── Preambles/header.tex         # LaTeX headers
+├── Quarto/                      # Quarto documents
+├── Slides/                      # Presentation slides
+├── scripts/R/                   # Shared R helpers, themes, palettes
+├── quality_reports/             # Plans, session logs, merge reports
+├── explorations/               # Research sandbox (60/100 threshold)
+├── comparisons/                 # Sub-project: method comparisons
+└── Missing Types/               # Sub-project: missing event types
+```
+
+## Commands
+
+```bash
+# LaTeX (3-pass XeLaTeX)
+cd Papers && TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode file.tex
+BIBINPUTS=..:$BIBINPUTS bibtex file
+# (repeat xelatex twice more)
+
+# R simulation
+Rscript scripts/R/filename.R
+
+# Quality score
+python scripts/quality_score.py file
+```
+
+## Quality Thresholds
+
+| Score | Gate | Meaning |
+|-------|------|---------|
+| 80 | Commit | Good enough to save |
+| 90 | PR | Ready for deployment |
+| 95 | Excellence | Aspirational |
+
+## Sub-Projects
+
+| Sub-Project | Path | Focus |
+|-------------|------|-------|
+| Comparisons | `comparisons/` | Method comparison simulations |
+| Missing Types | `Missing Types/` | Pseudo-observations with missing event types |
+
+**Shared:** `Bibliography_base.bib`, `scripts/R/`, `.claude/rules/`, `Figures/`
+
+**Conventions:** Okabe-Ito palette, `here::here()`, `set.seed(YYYYMMDD)`, figures 300 DPI / white bg
+
+## Workflow Loop
+
+```
+Your instruction → [PLAN] if needed → Your approval → [EXECUTE] → [REPORT]
+```
+
+**Non-negotiables:** `here::here()` paths, `set.seed(YYYYMMDD)`, Okabe-Ito palette, 300 DPI figures, subject-level bootstrap for recurrent events.

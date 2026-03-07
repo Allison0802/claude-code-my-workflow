@@ -22,12 +22,19 @@
 Research/
 ├── CLAUDE.MD                    # This file
 ├── .claude/                     # Rules, skills, agents, hooks
+│   ├── rules/                   # r-code-conventions.md, knowledge-base-template.md, etc.
+│   ├── agents/                  # domain-reviewer.md, etc.
+│   └── WORKFLOW_QUICK_REF.md   # Skill/command quick reference
 ├── Bibliography_base.bib        # Centralized bibliography (shared across sub-projects)
 ├── Figures/                     # Shared figures and images
 ├── Papers/                      # LaTeX manuscript chapters
 ├── Preambles/header.tex         # LaTeX headers
+├── Quarto/                      # Quarto documents
+├── Slides/                      # Presentation slides
 ├── scripts/                     # Utility scripts
 │   └── R/                       # Shared R code (helpers, themes, palettes)
+├── docs/                        # Documentation
+├── guide/                       # Project guide materials
 ├── quality_reports/             # Plans, session logs, merge reports
 ├── explorations/                # Research sandbox (see rules)
 ├── templates/                   # Session log, quality report templates

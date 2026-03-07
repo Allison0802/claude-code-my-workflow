@@ -1,0 +1,42 @@
+---
+description: R code standards for reproducibility, visuals, and domain correctness
+globs: "**/*.R"
+alwaysApply: false
+---
+
+# R Code Standards
+
+**Standard:** Senior Principal Data Engineer + PhD researcher quality
+
+## Reproducibility
+
+- `set.seed(YYYYMMDD)` once at top
+- All paths via `here::here()` — never hardcoded absolute paths
+- `dir.create(..., recursive = TRUE)` for output directories
+
+## Visual Identity (Okabe-Ito)
+
+```r
+okabe_ito <- c(orange = "#E69F00", sky_blue = "#56B4E9", green = "#009E73",
+  yellow = "#F0E442", blue = "#0072B2", vermilion = "#D55E00",
+  purple = "#CC79A7", black = "#000000")
+```
+
+Figures: `ggsave(..., width = 7, height = 5, dpi = 300, bg = "white")`
+
+## RDS Pattern
+
+Heavy computations saved as RDS; papers/analysis loads pre-computed data.
+
+## Common Pitfalls
+
+| Pitfall | Prevention |
+|---------|------------|
+| `bg = "transparent"` in papers | Use `bg = "white"` |
+| Hardcoded paths | Use `here::here()` |
+| Bootstrap resampling rows | Resample at subject level: `unique(id)` then filter |
+| `coxph()` time-varying covariates | Verify `tstart`/`tstop` intervals don't overlap |
+
+## Line Length
+
+Keep lines ≤ 100 chars. Exception: documented mathematical formulas may exceed if breaking harms readability.

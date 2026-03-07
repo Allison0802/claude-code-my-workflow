@@ -1,0 +1,37 @@
+---
+description: Comparisons sub-project — ML method comparisons for recurrent events
+globs: "comparisons/**"
+alwaysApply: false
+---
+
+# Comparisons Sub-Project
+
+Simulation study comparing Cox PH with ML methods (RF, cforest, MERF, MERFranger) for recurrent competing risks. 37 scenarios: frailty × complexity × rho × censoring.
+
+## Workflow (3 Phases)
+
+```bash
+cd Simulations/
+sbatch submit_comprehensive_comparison_array.sh   # Phase 1: Data + method comparison
+sbatch submit_analysis_comprehensive_robust.sh    # Phase 2: Aggregate results
+sbatch submit_organized_plots_robust.sh          # Phase 3: Plots
+```
+
+## Key Files
+
+- `functions.R` — `rate_cox_data_gen_complex()`, `transform_with_covariates_complex()`, pseudo-obs
+- `comprehensive_method_comparison.R` — Phase 1
+- `analyze_comprehensive_results_fixed.R` — Phase 2
+- `create_organized_plots.R` — Phase 3
+
+## Scenario Naming
+
+`f{frailty}_c{complexity}_rho{correlation}_{censoring}` e.g. `f0_c0_rho0.3_30pct`
+
+## Output
+
+- `results_comprehensive_time_specific_complex/*.rds`
+- `analysis_comprehensive_time_specific_complex/scenario_csvs/`, `overall_c_index_summary.csv`
+- `organized_plots/*.png`
+
+Inherits R conventions from parent. Metadata header required on all scripts.

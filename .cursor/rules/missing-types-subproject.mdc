@@ -1,0 +1,52 @@
+---
+description: Missing Types sub-project — imputation methods for missing event types
+globs: "Missing Types/**"
+alwaysApply: false
+---
+
+# Missing Types Sub-Project
+
+Statistical simulation comparing imputation methods for **missing event types in recurrent competing risks data**. Random Forest and Cox models with pseudo-observations.
+
+**Methods:** CCA, IPW (logistic), IPW-RF, Rate Proportion Model (RPM), Doubly Robust (AIPW)
+**Environment:** Slurm cluster (Longleaf at UNC)
+**Parent:** Inherits from `Research/.claude/rules/`
+
+## Where to Edit
+
+| Change | File(s) |
+|--------|---------|
+| Data gen, pseudo-obs, evaluation | `functions.R` |
+| Imputation logic | `missing_types_method_comparison_<method>.R` |
+| Slurm resources | `submit_missing_types_<method>.sh` |
+| Results, figures, LaTeX | `analyze_missing_types_results.R` |
+
+## Key Commands
+
+```bash
+TEST_RUN=true N_SIMS=2 bash run_missing_types_all_methods.sh  # Local test
+sbatch submit_missing_types_ipw_rf.sh                         # Submit to cluster
+SCENARIO_NAME="missing_MAR_50pct_dr" N_SIMS=2 Rscript missing_types_method_comparison_dr.R  # Debug
+Rscript analyze_missing_types_results.R                        # Re-analyze
+```
+
+## Critical Technical Details
+
+- **Subject-level bootstrap:** Use `fit_subject_weighted_rf` / `predict_subject_weighted_rf` — standard RF bootstrap doesn't respect clustering
+- **Train-test split:** At subject level (80-20) to prevent leakage
+- **IPW-RF:** Use only covariates that generate MAR: `ipw_features <- c("X", "Z")`
+
+## Data Flow
+
+Data Gen → Missing Types Introduced → Landmark Transform → Pseudo-obs → Model Fit → Evaluation
+
+## Metadata Header
+
+All scripts MUST include:
+```r
+# ============================================================================
+# METADATA
+# Description: [Brief]
+# Last Updated: YYYY-MM-DD
+# ============================================================================
+```

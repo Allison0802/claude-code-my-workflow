@@ -1,0 +1,28 @@
+---
+description: Use Claude skills from .claude/skills/ when tasks match
+alwaysApply: true
+---
+
+# Claude Skills in This Repo
+
+This repo includes **Claude skills** in `.claude/skills/`. Cursor loads them for compatibility; they are also symlinked under `.cursor/skills/` for discovery.
+
+## When to Use a Skill
+
+When the user's task matches a skill's trigger (e.g. Word docs, PDFs, spreadsheets, frontend design, presentations, proofreading, LaTeX compile, R review), **read the full skill** and follow it:
+
+1. **Identify the skill** — Match the task to a skill in `.claude/skills/` (or `.cursor/skills/`).
+2. **Read the skill file** — Open `.claude/skills/<skill-name>/SKILL.md` (or the same under `.cursor/skills/`) and follow its instructions.
+3. **Apply the skill** — Use any scripts, references, or assets the skill specifies.
+
+## Skills in This Repo (.claude/skills/)
+
+| Category | Skills (examples) |
+|----------|-------------------|
+| Documents | docx, pdf, pptx, xlsx |
+| Design / UI | frontend-design, theme-factory, canvas-design, algorithmic-art, brand-guidelines |
+| Workflow | doc-coauthoring, internal-comms, skill-creator, mcp-builder, humanizer |
+| Research / LaTeX | compile-latex, proofread, review-r, validate-bib, lit-review, research-ideation, review-paper, data-analysis |
+| Other | webapp-testing, web-artifacts-builder, slack-gif-creator |
+
+If a task clearly fits a skill's "Use when..." description, read that skill's `SKILL.md` and follow it before implementing.

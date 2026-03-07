@@ -1,0 +1,27 @@
+---
+description: Plan before non-trivial tasks; save plans to disk
+alwaysApply: true
+---
+
+# Plan-First Workflow
+
+**For any non-trivial task, enter plan mode before writing code.**
+
+## Protocol
+
+1. Check MEMORY.md for relevant `[LEARN]` entries
+2. Draft plan: what changes, which files, in what order
+3. Save to `quality_reports/plans/YYYY-MM-DD_short-description.md`
+4. Present to user — wait for approval
+5. Implement → Verify → Review → Fix → Re-verify → Score
+6. Save session log to `quality_reports/session_logs/`
+
+## Session Logging
+
+- **Post-plan:** Capture goal, approach, rationale
+- **Incremental:** Append 1-3 lines when design decisions change
+- **End-of-session:** Summary, quality scores, open questions
+
+## Recovery
+
+After new session: read CLAUDE.md, latest plan, `git log --oneline -10`, state current task.
