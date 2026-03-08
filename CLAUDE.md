@@ -6,6 +6,39 @@
 
 ---
 
+## Tech Stack
+
+| Tool | Version / Detail |
+|------|-----------------|
+| R | 4.4.0 (Longleaf HPC) |
+| LaTeX | XeLaTeX (3-pass + bibtex) |
+| Cluster | SLURM (UNC Longleaf) |
+| Key R packages | `survival`, `cmprsk`, `randomForest`, `ranger`, `partykit`, `LongituRF`, `SAEforest`, `glmnet`, `nnet`, `tidyverse`, `here` |
+
+---
+
+## Setup & Installation
+
+```bash
+# R packages (install once)
+install.packages(c(
+  "tidyverse", "survival", "cmprsk", "Hmisc",
+  "randomForest", "ranger", "partykit", "LongituRF", "SAEforest",
+  "glmnet", "nnet", "parallel", "here",
+  "gridExtra", "patchwork"
+))
+
+# LaTeX: requires XeLaTeX distribution (e.g., TeX Live or MacTeX)
+# Verify: xelatex --version
+
+# Clone sub-projects (separate repos)
+cd Research/
+git clone <comparisons-repo-url> comparisons/
+git clone <missing-types-repo-url> "Missing Types/"
+```
+
+---
+
 ## Core Principles
 
 - **Plan first** -- enter plan mode before non-trivial tasks; save plans to `quality_reports/plans/`
@@ -13,6 +46,7 @@
 - **Reproducibility** -- `set.seed(YYYYMMDD)`, `here::here()` paths, all results replicable
 - **Quality gates** -- nothing ships below 80/100
 - **[LEARN] tags** -- when corrected, save `[LEARN:category] wrong → right` to MEMORY.md
+- **Change logging** -- after any major script change, update the `Last Updated` metadata header and append a one-line entry to `quality_reports/session_logs/` describing what changed and why
 
 ---
 
@@ -20,7 +54,7 @@
 
 ```
 Research/
-├── CLAUDE.MD                    # This file
+├── CLAUDE.md                    # This file
 ├── .claude/                     # Rules, skills, agents, hooks
 │   ├── rules/                   # r-code-conventions.md, knowledge-base-template.md, etc.
 │   ├── agents/                  # domain-reviewer.md, etc.
@@ -110,6 +144,18 @@ This repo is the **parent hub** for two sub-projects that are separate git repos
 - `here::here()` for all file paths in R
 - `set.seed(YYYYMMDD)` at top of every stochastic script
 - Publication-ready figures: 300 DPI, white background, `.pdf` or `.png`
+
+---
+
+## Architecture
+
+```
+Data Generation → Landmark Transformation → Pseudo-observations → Model Fitting → Evaluation
+```
+
+- **Comparisons project**: Generates recurrent competing risks data under 37 scenarios (frailty × complexity × correlation × censoring), fits Cox/RF/MERF models, evaluates via time-specific C-index
+- **Missing Types project**: Introduces MCAR/MAR missingness (10-50%) into event types, applies 5 imputation methods (CCA, IPW, IPW-RF, RPM, DR), evaluates recovery of predictive performance
+- Both projects share `functions.R` for data generation (`rate_cox_data_gen_complex()`), landmark transformation, and pseudo-observation computation
 
 ---
 
