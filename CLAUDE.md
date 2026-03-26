@@ -46,7 +46,7 @@ git clone <missing-types-repo-url> "Missing Types/"
 - **Reproducibility** -- `set.seed(YYYYMMDD)`, `here::here()` paths, all results replicable
 - **Quality gates** -- nothing ships below 80/100
 - **[LEARN] tags** -- when corrected, save `[LEARN:category] wrong → right` to MEMORY.md
-- **Change logging** -- after any major script change, update the `Last Updated` metadata header and append a one-line entry to `quality_reports/session_logs/` describing what changed and why
+- **Change logging** -- after any major change in **any folder** (parent or subprojects `comparisons/`, `Missing Types/`): (1) update the `Last Updated` metadata header in the modified script, and (2) append a one-line entry to `quality_reports/session_logs/` describing what changed and why
 
 ---
 
@@ -107,20 +107,103 @@ python scripts/quality_score.py file
 
 ---
 
-## Skills Quick Reference
+## Skills & Agents Quick Reference
+
+### Writing & Manuscript
 
 | Command | What It Does |
 |---------|-------------|
-| `/compile-latex [file]` | 3-pass XeLaTeX + bibtex |
+| `/compile-latex [file]` | 3-pass XeLaTeX + bibtex (manual) |
+| `/paper-compile [file]` | Compile LaTeX, auto-fix errors, verify output |
 | `/proofread [file]` | Grammar/typo review |
-| `/review-r [file]` | R code quality review |
+| `/review-paper [file]` | Deep manuscript review |
 | `/validate-bib` | Cross-reference citations |
-| `/commit [msg]` | Stage, commit, PR, merge |
+| `/paper-plan [outline]` | Structured paper outline from review + results |
+| `/paper-write [section]` | Draft LaTeX section by section |
+| `/paper-figure [results]` | Publication-quality figures from experiment data |
+| `/paper-writing [outline]` | Full pipeline: plan → figures → write → compile |
+| `/auto-paper-improvement-loop [file]` | Autonomous GPT review → fix → recompile loop |
+
+### R Code & Analysis
+
+| Command | What It Does |
+|---------|-------------|
+| `/review-r [file]` | R code quality, reproducibility, figure compliance |
+| `/data-analysis [dataset]` | End-to-end R analysis workflow |
+| `/analyze-results [path]` | Analyze experiment results, build comparison tables |
+| `/visual-audit [file]` | Figure layout audit (overflow, fonts, spacing) |
+
+### SLURM / Simulation
+
+| Command | What It Does |
+|---------|-------------|
+| `/run-experiment [script]` | Deploy and run R simulations on Longleaf SLURM |
+| `/monitor-experiment [job]` | Check SLURM progress, collect results, flag failures |
+
+### Literature & Ideas
+
+| Command | What It Does |
+|---------|-------------|
 | `/lit-review [topic]` | Literature search + synthesis |
+| `/research-lit [topic]` | Search papers, find related work, summarize key ideas |
+| `/arxiv [query]` | Search, download, summarize arXiv papers |
+| `/novelty-check [idea]` | Verify novelty against recent literature |
+| `/idea-creator [topic]` | Generate and rank research ideas |
+| `/idea-discovery [topic]` | Full pipeline: lit → ideas → novelty check |
 | `/research-ideation [topic]` | Research questions + strategies |
 | `/interview-me [topic]` | Interactive research interview |
-| `/review-paper [file]` | Manuscript review |
-| `/data-analysis [dataset]` | End-to-end R analysis |
+
+### Review & QA
+
+| Command | What It Does |
+|---------|-------------|
+| `/research-review [file]` | Deep critical review via GPT/Codex |
+| `/auto-review-loop [file]` | Autonomous multi-round review → fix loop |
+| `/auto-review-loop-llm [file]` | Same, using any OpenAI-compatible LLM API |
+| `/devils-advocate [claim]` | Adversarial review of methods or arguments |
+| `/proof-writer [theorem]` | Write rigorous mathematical proofs |
+| `/research-pipeline [topic]` | Full pipeline: idea discovery → implementation → review |
+
+### Git
+
+| Command | What It Does |
+|---------|-------------|
+| `/commit [msg]` | Stage, commit, PR, merge with quality check |
+
+---
+
+## Agents Quick Reference
+
+Agents run autonomously via the Agent tool. Invoke proactively after completing work.
+
+| Agent | When to Use |
+|-------|------------|
+| `domain-reviewer` | After drafting methods, simulations, or results — checks statistical correctness through 5 lenses (survival analysis + ML expertise) |
+| `r-reviewer` | After writing or modifying any R script — checks code quality, reproducibility, figure standards |
+| `verifier` | Before committing or creating PRs — checks compile, render, deploy |
+| `proofreader` | After creating or modifying manuscript content — grammar, typos, overflow |
+
+---
+
+## Scientific Skills (claude-scientific-skills bundle)
+
+Available at `.claude/skills/claude-scientific-skills/scientific-skills/`. Reference for methodology and Python cross-checking:
+
+| Skill | Relevance |
+|-------|----------|
+| `scikit-survival` | Survival analysis reference: Cox, RSF, concordance index, competing risks |
+| `statistical-analysis` | Test selection, assumption checks, APA-formatted results |
+| `exploratory-data-analysis` | EDA guidance for simulation output |
+| `pymc` | Bayesian frailty modeling (hierarchical extension research) |
+| `pubmed-database` | Medical literature search for clinical context |
+| `openalex-database` | Academic paper search across all fields |
+| `literature-review` | Structured lit review workflow |
+| `hypothesis-generation` | Research hypothesis development |
+| `peer-review` | Manuscript peer review guidance |
+| `scientific-writing` | Academic writing style and structure |
+
+**Dormant** (slide/teaching focused — reactivate for defense or job talk):
+`create-lecture`, `pedagogy-review`, `slide-excellence`, `translate-to-quarto`, `qa-quarto`, `extract-tikz`
 
 ---
 
@@ -156,6 +239,31 @@ Data Generation → Landmark Transformation → Pseudo-observations → Model Fi
 - **Comparisons project**: Generates recurrent competing risks data under 37 scenarios (frailty × complexity × correlation × censoring), fits Cox/RF/MERF models, evaluates via time-specific C-index
 - **Missing Types project**: Introduces MCAR/MAR missingness (10-50%) into event types, applies 5 imputation methods (CCA, IPW, IPW-RF, RPM, DR), evaluates recovery of predictive performance
 - Both projects share `functions.R` for data generation (`rate_cox_data_gen_complex()`), landmark transformation, and pseudo-observation computation
+
+---
+
+## Change Logging
+
+**This rule applies to the parent folder and both subprojects (`comparisons/`, `Missing Types/`).**
+
+After any major change (new feature, bug fix, refactored function, new scenario, updated analysis), Claude MUST:
+
+1. **Update script header** -- set `Last Updated: YYYY-MM-DD` in the modified file's metadata block.
+2. **Append a session log entry** -- add one line to `quality_reports/session_logs/YYYY-MM-DD_description.md`:
+   ```
+   - [HH:MM] <file or folder> — <what changed and why>
+   ```
+   Create the file if it does not exist for today's date.
+
+**Triggers (log any of these):**
+- R script added, edited, or deleted
+- Simulation scenario added or removed
+- Analysis pipeline changed
+- LaTeX manuscript section edited
+- Figure generation updated
+- Functions in `functions.R` modified
+
+**Do not log:** trivial whitespace fixes, comment-only edits, or auto-generated output files.
 
 ---
 

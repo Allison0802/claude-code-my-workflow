@@ -42,7 +42,13 @@
       "Bash(for *)",
       "Bash(gs *)",
       "Bash(pdftk *)",
-      "Bash(mkdir *)"
+      "Bash(mkdir *)",
+      "Bash(do echo:*)",
+      "Bash(grep -c '\"\"type\"\":\"\"assistant\"\"' /private/tmp/claude-501/-Users-alison-Library-CloudStorage-OneDrive-UniversityofNorthCarolinaatChapelHill-Research/c6ee5053-87a1-40ca-a031-6ab2975a44b5/tasks/a1ca6f86fd937ae3c.output)",
+      "Bash(grep -c '\"\"type\"\":\"\"assistant\"\"' /private/tmp/claude-501/-Users-alison-Library-CloudStorage-OneDrive-UniversityofNorthCarolinaatChapelHill-Research/c6ee5053-87a1-40ca-a031-6ab2975a44b5/tasks/a0ee6c9bf0838aed4.output)"
+    ],
+    "additionalDirectories": [
+      "/Users/alison/Library/CloudStorage/OneDrive-UniversityofNorthCarolinaatChapelHill/Research/Missing Types/variance estimator"
     ]
   },
   "hooks": {
