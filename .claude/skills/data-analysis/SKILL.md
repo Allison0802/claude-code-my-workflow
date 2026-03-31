@@ -1,6 +1,6 @@
 ---
 name: data-analysis
-description: End-to-end R data analysis workflow from exploration through regression to publication-ready tables and figures
+description: End-to-end R data analysis workflow for survival/simulation data: exploration, model fitting, and publication-ready tables and figures
 disable-model-invocation: true
 argument-hint: "[dataset path or description of analysis goal]"
 allowed-tools: ["Read", "Grep", "Glob", "Write", "Edit", "Bash", "Task"]
@@ -10,7 +10,7 @@ allowed-tools: ["Read", "Grep", "Glob", "Write", "Edit", "Bash", "Task"]
 
 Run an end-to-end data analysis in R: load, explore, analyze, and produce publication-ready output.
 
-**Input:** `$ARGUMENTS` — a dataset path (e.g., `data/county_panel.csv`) or a description of the analysis goal (e.g., "regress wages on education with state fixed effects using CPS data").
+**Input:** `$ARGUMENTS` — a dataset path (e.g., `comparisons/results/sim_output.csv`) or a description of the analysis goal (e.g., "summarize C-index across methods and scenarios from simulation output").
 
 ---
 
@@ -49,21 +49,21 @@ Save all diagnostic figures to `output/diagnostics/`.
 ### Phase 3: Main Analysis
 
 Based on the research question:
-- **Regression analysis:** Use `fixest` for panel data, `lm`/`glm` for cross-section
-- **Standard errors:** Cluster at the appropriate level (document why)
-- **Multiple specifications:** Start simple, progressively add controls
-- **Effect sizes:** Report standardized effects alongside raw coefficients
+- **Survival models:** Use `survival` (Cox, Kaplan-Meier), `cmprsk` (competing risks), `ranger`/`randomForest` for RSF
+- **Standard errors:** Use bootstrap or sandwich estimators; document the approach
+- **Multiple methods:** Compare across methods (Cox, RSF, MERF, etc.) and scenarios
+- **Performance metrics:** Report C-index, Brier score, IPA — not just point estimates
 
 ### Phase 4: Publication-Ready Output
 
 **Tables:**
-- Use `modelsummary` for regression tables (preferred) or `stargazer`
-- Include all standard elements: coefficients, SEs, significance stars, N, R-squared
+- Use `knitr::kable()` for summary tables or custom `data.frame` → `kable` pipeline
+- Include all standard elements: method name, scenario, C-index (mean ± SD), N simulations
 - Export as `.tex` for LaTeX inclusion and `.html` for quick viewing
 
 **Figures:**
 - Use `ggplot2` with project theme
-- Set `bg = "transparent"` for Beamer compatibility
+- Set `bg = "white"` (300 DPI, white background per project standards)
 - Include proper axis labels (sentence case, units)
 - Export with explicit dimensions: `ggsave(width = X, height = Y)`
 - Save as both `.pdf` and `.png`
@@ -98,10 +98,10 @@ Follow this template:
 
 # 0. Setup ----
 library(tidyverse)
-library(fixest)
-library(modelsummary)
+library(survival)
+library(here)
 
-set.seed(42)
+set.seed(20240101)  # set.seed(YYYYMMDD) per project convention
 
 dir.create("output/analysis", recursive = TRUE, showWarnings = FALSE)
 
