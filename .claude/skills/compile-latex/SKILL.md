@@ -1,19 +1,29 @@
 ---
 name: compile-latex
-description: Compile a Beamer LaTeX slide deck with XeLaTeX (3 passes + bibtex). Use when compiling lecture slides.
+description: Compile a LaTeX manuscript or Beamer slide deck with XeLaTeX (3 passes + bibtex). Use when compiling manuscripts in Papers/ or slides in Slides/.
 disable-model-invocation: true
 argument-hint: "[filename without .tex extension]"
 allowed-tools: ["Read", "Bash", "Glob"]
 ---
 
-# Compile Beamer LaTeX Slides
+# Compile LaTeX (Manuscripts and Slides)
 
-Compile a Beamer slide deck using XeLaTeX with full citation resolution.
+Compile a LaTeX manuscript or Beamer slide deck using XeLaTeX with full citation resolution.
 
 ## Steps
 
-1. **Navigate to Slides/ directory** and compile with 3-pass sequence:
+1. **Detect target directory** — use `Papers/` for manuscripts, `Slides/` for presentations — then compile with 3-pass sequence:
 
+**Manuscript (Papers/):**
+```bash
+cd Papers
+TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode $ARGUMENTS.tex
+BIBINPUTS=..:$BIBINPUTS bibtex $ARGUMENTS
+TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode $ARGUMENTS.tex
+TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode $ARGUMENTS.tex
+```
+
+**Slides (Slides/):**
 ```bash
 cd Slides
 TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode $ARGUMENTS.tex
@@ -22,9 +32,9 @@ TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode $ARGUMENTS.te
 TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode $ARGUMENTS.tex
 ```
 
-**Alternative (latexmk):**
+**Alternative (latexmk, either directory):**
 ```bash
-cd Slides
+cd Papers  # or Slides/
 TEXINPUTS=../Preambles:$TEXINPUTS BIBINPUTS=..:$BIBINPUTS latexmk -xelatex -interaction=nonstopmode $ARGUMENTS.tex
 ```
 
@@ -35,7 +45,8 @@ TEXINPUTS=../Preambles:$TEXINPUTS BIBINPUTS=..:$BIBINPUTS latexmk -xelatex -inte
 
 3. **Open the PDF** for visual verification:
    ```bash
-   open Slides/$ARGUMENTS.pdf
+   open Papers/$ARGUMENTS.pdf   # manuscript
+   open Slides/$ARGUMENTS.pdf   # slides
    ```
 
 4. **Report results:**
