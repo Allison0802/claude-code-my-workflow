@@ -202,8 +202,8 @@ Available at `.claude/skills/claude-scientific-skills/scientific-skills/`. Refer
 | `peer-review` | Manuscript peer review guidance |
 | `scientific-writing` | Academic writing style and structure |
 
-**Dormant** (slide/teaching focused — reactivate for defense or job talk):
-`create-lecture`, `pedagogy-review`, `slide-excellence`, `translate-to-quarto`, `qa-quarto`, `extract-tikz`
+**Dormant** (slide/teaching focused — archived to `.claude/skills/_DORMANT/`, reactivate for defense or job talk):
+`translate-to-quarto`, `create-lecture`, `slide-excellence`, `qa-quarto`, `pedagogy-review`, `extract-tikz`, `deploy`, `visual-audit`, `devils-advocate`
 
 ---
 
