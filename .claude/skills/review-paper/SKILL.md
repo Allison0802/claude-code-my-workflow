@@ -1,6 +1,6 @@
 ---
 name: review-paper
-description: Comprehensive manuscript review covering argument structure, econometric specification, citation completeness, and potential referee objections
+description: Comprehensive manuscript review covering argument structure, statistical methodology, citation completeness, and potential referee objections
 disable-model-invocation: true
 argument-hint: "[paper filename in master_supporting_docs/ or path to .tex/.pdf]"
 allowed-tools: ["Read", "Grep", "Glob", "Write", "Task"]
@@ -42,19 +42,19 @@ Produce a thorough, constructive review of an academic manuscript — the kind o
 - Are the conclusions supported by the evidence?
 - Are limitations acknowledged?
 
-### 2. Identification Strategy
-- Is the causal claim credible?
-- What are the key identifying assumptions? Are they stated explicitly?
-- Are there threats to identification (omitted variables, reverse causality, measurement error)?
-- Are robustness checks adequate?
-- Is the estimator appropriate for the research design?
+### 2. Statistical Methodology
+- Is the statistical model appropriate for the data structure (recurrent events, competing risks, censoring)?
+- Are the key modeling assumptions stated explicitly and justified?
+- Are there threats to validity (informative censoring, model misspecification, violation of independence)?
+- Are robustness checks or sensitivity analyses adequate?
+- Is the estimator appropriate for the estimand of interest?
 
-### 3. Econometric Specification
-- Correct standard errors (clustered? robust? bootstrap?)?
-- Appropriate functional form?
-- Sample selection issues?
-- Multiple testing concerns?
-- Are point estimates economically meaningful (not just statistically significant)?
+### 3. Estimation Approach
+- Correct variance estimation (sandwich estimator, bootstrap, or analytical)?
+- Appropriate baseline hazard or cumulative incidence specification?
+- Sample size and power adequate for the claimed precision?
+- Multiple testing or selection concerns when comparing many methods?
+- Are performance metrics (C-index, Brier score, IPA) interpreted correctly?
 
 ### 4. Literature Positioning
 - Are the key papers cited?
@@ -101,7 +101,7 @@ Produce a thorough, constructive review of an academic manuscript — the kind o
 ## Major Concerns
 
 ### MC1: [Title]
-- **Dimension:** [Identification / Econometrics / Argument / Literature / Writing / Presentation]
+- **Dimension:** [Statistical Methodology / Estimation / Argument / Literature / Writing / Presentation]
 - **Issue:** [Specific description]
 - **Suggestion:** [How to address it]
 - **Location:** [Section/page/table if applicable]
@@ -135,8 +135,8 @@ These are the tough questions a top referee would likely raise:
 | Dimension | Rating (1-5) |
 |-----------|-------------|
 | Argument Structure | [N] |
-| Identification | [N] |
-| Econometrics | [N] |
+| Statistical Methodology | [N] |
+| Estimation Approach | [N] |
 | Literature | [N] |
 | Writing | [N] |
 | Presentation | [N] |
