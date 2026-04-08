@@ -55,3 +55,15 @@ overshoot` or `general small-group jackknife sensitivity`.
 
 After this fix, more NA pseudo-obs will appear in `validation_mode = "none"` (main simulation).
 Check whether `randomForest`/`ranger` error on NA outcomes in `simulation_runner.R`.
+
+---
+**Context compaction (manual) at 19:45**
+Check git log and quality_reports/plans/ for current state.
+
+## 2026-04-08 Longleaf Rerun — Final Validation
+
+- [session] Longleaf first-pass (21 scenarios) and trace-extract (56 jobs, 210 requests) completed and synced
+- [session] Diagnosis: Stage complete, 21/21 cells, 0 FL-KM bugs — 105 benign jackknife overshoot, 105 correctly handled invalidity
+- [session] `simulation_runner.R` confirmed to already filter `!is.na(pseudoEst_km_*)` before model fitting (lines 597–617), with `nrow > 10` empty-set guards (lines 678, 718) — NA pseudo-obs are safe
+- [fix] `flkm_warning_validation_analysis.R`: added `all_audits_benign` fast-path in `recommend_flkm_validation_action()` — when all audit classes are benign, return "rerun full grid as-is" without requiring raw flag rate thresholds
+- [result] Final recommendation: **rerun full grid as-is** — FL-KM validation pipeline complete
