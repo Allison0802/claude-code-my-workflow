@@ -15,3 +15,7 @@
 1. Compute paired Wilcoxon tests on 100 C-index splits → add Supplementary Table S10
 2. Regenerate `pdp_rf_strat_acute_top6.png` with same ggplot script (visual consistency)
 3. Verify R_i^{(k)}(t) = recurrence rate (events/time) in §2.3
+
+---
+**Context compaction (auto) at 12:36**
+Check git log and quality_reports/plans/ for current state.
