@@ -410,7 +410,7 @@ Agent:
     [ROUND_N_PROMPT below]
 ```
 
-#### ROUND_N_PROMPT (shared by both backends, applies to Round 2 and all subsequent rounds)
+#### ROUND_N_PROMPT (shared by both backends, applies to all rounds N ≥ 2)
 
 ```
 [Round N update]
@@ -437,7 +437,7 @@ Pay particular attention to:
 
 ### Step N.3: Implement Round N Fixes
 
-Same process as Step 3, including NotebookLM consultation for CRITICAL/MAJOR fixes. Typical Round 2 fixes for methodology papers:
+Same process as Step 3, including NotebookLM consultation for CRITICAL/MAJOR fixes. Typical Round N fixes for methodology papers:
 - Tighten assumptions (replace "mild regularity conditions" with formal statements)
 - Add Monte Carlo SEs to key simulation cells
 - Add or strengthen the limitations paragraph (model misspecification, computational cost, extension to clustered data)
