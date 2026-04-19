@@ -2,7 +2,7 @@
 name: novelty-check
 description: Verify research idea novelty against recent literature. Use when user says "查新", "novelty check", "有没有人做过", "check novelty", or wants to verify a research idea is novel before implementing.
 argument-hint: [method-or-idea-description]
-allowed-tools: WebSearch, WebFetch, Grep, Read, Glob, mcp__codex__codex
+allowed-tools: WebSearch, WebFetch, Grep, Read, Glob, Agent, mcp__codex__codex, mcp__notebooklm__notebook_query
 ---
 
 # Novelty Check Skill
@@ -12,6 +12,8 @@ Check whether a proposed method/idea has already been done in the literature: **
 ## Constants
 
 - REVIEWER_MODEL = `gpt-5.4` — Model used via Codex MCP. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`)
+
+**Reviewer fallback & NotebookLM:** When Codex MCP is unavailable, this skill falls back to a Claude subagent reviewer — **always use `model: "opus"`** in the Agent call. Before implementing CRITICAL/MAJOR changes from reviews, consult NotebookLM. See `.claude/rules/codex-fallback-protocol.md` for full protocol.
 
 ## Instructions
 

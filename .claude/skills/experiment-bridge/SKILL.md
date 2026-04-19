@@ -2,7 +2,7 @@
 name: experiment-bridge
 description: "Workflow 1.5: Bridge between idea discovery and auto review. Reads EXPERIMENT_PLAN.md, implements experiment code, deploys to GPU, collects initial results. Use when user says \"实现实验\", \"implement experiments\", \"bridge\", \"从计划到跑实验\", \"deploy the plan\", or has an experiment plan ready to execute."
 argument-hint: [experiment-plan-path-or-topic]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply, mcp__notebooklm__notebook_query
 ---
 
 # Workflow 1.5: Experiment Bridge
@@ -30,6 +30,8 @@ refine-logs/FINAL_PROPOSAL.md
 - **COMPACT = false** — When `true`, (1) read `IDEA_CANDIDATES.md` instead of full `IDEA_REPORT.md` if available, (2) append experiment results to `EXPERIMENT_LOG.md` after collection.
 
 > Override: `/experiment-bridge "EXPERIMENT_PLAN.md" — compact: true, base repo: https://github.com/org/project`
+
+**Reviewer fallback & NotebookLM:** When Codex MCP is unavailable, this skill falls back to a Claude subagent reviewer — **always use `model: "opus"`** in the Agent call. Before implementing CRITICAL/MAJOR changes from reviews, consult NotebookLM. See `.claude/rules/codex-fallback-protocol.md` for full protocol.
 
 ## Inputs
 

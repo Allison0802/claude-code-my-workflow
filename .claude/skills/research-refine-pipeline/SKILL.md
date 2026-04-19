@@ -1,7 +1,7 @@
 ---
 name: research-refine-pipeline
 description: 'Run an end-to-end workflow that chains `research-refine` and `experiment-plan`. Use when the user wants a one-shot pipeline from vague research direction to focused final proposal plus detailed experiment roadmap, or asks to "串起来", build a pipeline, do it end-to-end, or generate both the method and experiment plan together.'
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, mcp__codex__codex, mcp__codex__codex-reply, mcp__notebooklm__notebook_query
 ---
 
 # Research Refine Pipeline: End-to-End Method and Experiment Planning
@@ -26,6 +26,8 @@ For stage-specific detail, read these sibling skills only when needed:
 
 - `../research-refine/SKILL.md`
 - `../experiment-plan/SKILL.md`
+
+**Reviewer fallback & NotebookLM:** When Codex MCP is unavailable, this skill falls back to a Claude subagent reviewer — **always use `model: "opus"`** in the Agent call. Before implementing CRITICAL/MAJOR changes from reviews, consult NotebookLM. See `.claude/rules/codex-fallback-protocol.md` for full protocol.
 
 ## Core Rule
 

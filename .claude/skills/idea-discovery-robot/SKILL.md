@@ -2,7 +2,7 @@
 name: idea-discovery-robot
 description: "Workflow 1 adaptation for robotics and embodied AI. Orchestrates robotics-aware literature survey, idea generation, novelty check, and critical review to go from a broad robotics direction to benchmark-grounded, simulation-first ideas. Use when user says \"robotics idea discovery\", \"机器人找idea\", \"embodied AI idea\", \"机器人方向探索\", \"sim2real 选题\", or wants ideas for manipulation, locomotion, navigation, drones, humanoids, or general robot learning."
 argument-hint: [robotics-direction]
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, Skill, mcp__codex__codex, mcp__codex__codex-reply, mcp__notebooklm__notebook_query
 ---
 
 # Robotics Idea Discovery Pipeline
@@ -43,6 +43,8 @@ The goal is not to produce flashy demos. The goal is to produce ideas that are:
 - **TARGET_VENUES = CoRL, RSS, ICRA, IROS, RA-L** — Default novelty and reviewer framing
 
 > Override inline, e.g. `/idea-discovery-robot "bimanual manipulation" — only sim ideas, no real robot` or `/idea-discovery-robot "drone navigation" — focus on CoRL/RSS, 2 pilot ideas max`
+
+**Reviewer fallback & NotebookLM:** When Codex MCP is unavailable, this skill falls back to a Claude subagent reviewer — **always use `model: "opus"`** in the Agent call. Before implementing CRITICAL/MAJOR changes from reviews, consult NotebookLM. See `.claude/rules/codex-fallback-protocol.md` for full protocol.
 
 ## Execution Rule
 

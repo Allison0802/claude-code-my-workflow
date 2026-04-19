@@ -1,7 +1,7 @@
 ---
 name: method-derive
 description: 'Derive new statistical estimators end-to-end: freeze the estimand, write the full mathematical derivation, run an iterative GPT-5.4 review loop until the math is sound, implement the estimator in R, verify it via Monte Carlo pilot (bias ≈ 0, SE ratio ≈ 1, nominal coverage), and generate SLURM job files for a full simulation study. Use whenever the user says "derive this estimator", "show this is unbiased", "prove the variance formula", "design a simulation for this method", "write a simulation script", "check my math on this", or needs to go from a theoretical method idea to working, verified R simulation code. Also triggers on: identification arguments, pseudo-observation regularity, IPW validity, sandwich/jackknife variance, asymptotic normality, DGP design, Monte Carlo performance checks, or any request that combines statistical theory with simulation verification.'
-allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, mcp__codex__codex, mcp__codex__codex-reply
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, mcp__codex__codex, mcp__codex__codex-reply, mcp__notebooklm__notebook_query
 ---
 
 # Method Derive: Estimand-Anchored Derivation and Simulation Verification
@@ -47,6 +47,8 @@ Input (ESTIMAND + proposed METHOD)
 - **COVERAGE_PILOT_RANGE = [0.91, 0.99]** — Monte Carlo tolerance at B = 500
 
 > Override constants via argument if needed, e.g. `-- pilot_n: 100, pilot_reps: 200`.
+
+**Reviewer fallback & NotebookLM:** When Codex MCP is unavailable, this skill falls back to a Claude subagent reviewer — **always use `model: "opus"`** in the Agent call. Before implementing CRITICAL/MAJOR changes from reviews, consult NotebookLM. See `.claude/rules/codex-fallback-protocol.md` for full protocol.
 
 ## State Persistence (Checkpoint Recovery)
 
