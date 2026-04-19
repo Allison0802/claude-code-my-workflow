@@ -338,6 +338,23 @@ cp main.pdf main_round1.pdf
 
 Verify: 0 undefined references, 0 undefined citations.
 
+### Step R.0: Re-collect Paper Text (before Round N ≥ 2)
+
+**Applies to:** Every round after the first — before Round 2, before Round 3, ..., before Round MAX_ROUNDS. Runs after the recompile step for Round N-1 and before Step 1.5 (pre-pass) for Round N.
+
+**Always runs regardless of `FLOW_PREPASS`.** The reviewer for Round N must see the post-fix paper text whether or not the pre-pass is enabled.
+
+Re-run the same collection loop from Step 1, overwriting `/tmp/paper_full_text.txt` with the updated sources:
+
+```bash
+for f in paper/sections/*.tex; do
+    echo "% === $(basename $f) ==="
+    cat "$f"
+done > /tmp/paper_full_text.txt
+```
+
+**Failure policy:** If re-collection fails (e.g., missing section file), log `"Re-collection failed before Round N — using stale /tmp/paper_full_text.txt"` to `PAPER_IMPROVEMENT_LOG.md` and proceed with whatever text is at that path. Do not abort.
+
 ### Step 5: Round 2 Review
 
 **Branch by `REVIEWER_BACKEND`:**
