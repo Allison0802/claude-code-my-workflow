@@ -431,11 +431,11 @@ Pay particular attention to:
 - Whether the real data section adds substantive insight
 ```
 
-### Step 5b: Human Checkpoint (if enabled)
+### Step N.2: Human Checkpoint (if enabled)
 
-**Skip if `HUMAN_CHECKPOINT = false`.** Same as Step 2b — present Round 2 review, wait for user input.
+**Skip if `HUMAN_CHECKPOINT = false`.** Same as Step 2b — present Round N review, wait for user input.
 
-### Step 6: Implement Round 2 Fixes
+### Step N.3: Implement Round N Fixes
 
 Same process as Step 3, including NotebookLM consultation for CRITICAL/MAJOR fixes. Typical Round 2 fixes for methodology papers:
 - Tighten assumptions (replace "mild regularity conditions" with formal statements)
@@ -445,7 +445,7 @@ Same process as Step 3, including NotebookLM consultation for CRITICAL/MAJOR fix
 - Ensure every theorem's proof in Supplement matches notation in main text
 - Confirm all claimed references exist in `.bib` and are cited in the right location
 
-### Step 7: Recompile Round 2
+### Step N.4: Recompile Round N
 
 ```bash
 cd paper
