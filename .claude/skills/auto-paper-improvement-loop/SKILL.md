@@ -79,6 +79,69 @@ for f in paper/sections/*.tex; do
 done > /tmp/paper_full_text.txt
 ```
 
+### Step 1.5: Logic Flow Pre-Pass (Round N)
+
+**Applies to:** All rounds, Round 1 through Round MAX_ROUNDS. Runs after Step 1 (Round 1) or after Step R.0 paper re-collection (Round N ≥ 2).
+
+**Skip entirely if `FLOW_PREPASS = false`.** When skipped, set `FLOW_PREPASS_OUTPUT_RN = ""` and proceed to the reviewer call for Round N with the prompt unchanged.
+
+Spawn a pre-pass subagent. Save the full response as the runtime variable `FLOW_PREPASS_OUTPUT_RN` (where N is the current round number; e.g., `FLOW_PREPASS_OUTPUT_R1` in Round 1, `FLOW_PREPASS_OUTPUT_R3` in Round 3). This variable is **not** persisted to `PAPER_IMPROVEMENT_STATE.json` — it is regenerated fresh each round.
+
+```
+Agent:
+  description: "Logic flow pre-pass (Round N)"
+  model: "opus"
+  prompt: |
+    You are an expert academic editor specializing in scientific writing structure.
+    Read the following biostatistics methodology paper and produce a structured
+    logic flow analysis at two levels: section-to-section and paragraph-to-paragraph.
+
+    ## Full Paper Text:
+    [contents of /tmp/paper_full_text.txt]
+
+    ## Output Format
+
+    ### Section-Level Arc
+    For each section, write one sentence describing what it argues or establishes.
+    Then describe the logical connector to the next section (e.g., "motivates",
+    "formalizes", "tests", "interprets", "extends"). Format:
+      Introduction → [argues X] →(motivates)→
+      Methods → [formalizes X as estimator Y] →(tested by)→
+      Simulation → [tests Y under scenarios A/B/C] →(interpreted in)→
+      Results → [shows Z] →(interpreted in)→
+      Discussion → [claims W]
+
+    ### Paragraph-Level Flow (per section)
+    For each section, list each paragraph's main point in one clause, and note the
+    logical link to the next paragraph (e.g., "extends", "contrasts", "justifies",
+    "abrupt shift"). Flag any abrupt shifts.
+    Format per section:
+      [Section name]:
+        P1: [argues X] →(extends to)→ P2: [formalizes Y] →(abrupt shift)→ P3: [introduces Z]
+
+    ### Detected Breaks
+    List any logic-flow problems found, in order of severity:
+    - CRITICAL: A later section relies on something never established earlier
+    - CRITICAL: A paragraph introduces a concept with no link to prior or next paragraph
+    - MAJOR: A claim in one section is not supported or followed up in the next
+    - MINOR: An abrupt paragraph transition with no bridging sentence
+
+    Be specific: name the sections and paragraphs involved.
+
+    Output the analysis only. Do not include any preamble, greeting, or closing remarks.
+```
+
+Note: CRITICAL/MAJOR/MINOR tags are **structural observations only** — advisory scaffolding. The reviewer assigns final fix severity.
+
+**Injection into the reviewer prompt (by backend and round):**
+
+- **Round 1, Codex backend:** Prepend `## Logic Flow Pre-Analysis\n[FLOW_PREPASS_OUTPUT_R1 verbatim]\n\n---\n` immediately before `## Full Paper Text` in the REVIEWER_PROMPT string. Skip if `FLOW_PREPASS_OUTPUT_R1` is empty.
+- **Round 1, Subagent backend:** Same as Codex Round 1.
+- **Round N ≥ 2, Codex backend (`codex-reply`):** Prepend `## Logic Flow Pre-Analysis (Round N)\n[FLOW_PREPASS_OUTPUT_RN verbatim]\n\n---\n` at the **top** of ROUND_N_PROMPT (there is no `## Full Paper Text` anchor in this path — the paper text is in thread history). This rule applies to **every** subsequent-round Codex call (Round 2, Round 3, Round 4, ...). Skip if `FLOW_PREPASS_OUTPUT_RN` is empty.
+- **Round N ≥ 2, Subagent backend:** Insert the pre-analysis block between the "Fixes Implemented" list and the ROUND_N_PROMPT instructions. Skip if empty.
+
+**Failure policy (applies to every round N):** If the pre-pass subagent errors or times out, log `"Flow pre-pass failed for Round N — proceeding with unchanged reviewer prompt"` to `PAPER_IMPROVEMENT_LOG.md` and set `FLOW_PREPASS_OUTPUT_RN = ""`. Continue the reviewer call for Round N without injection. Do not retry, do not abort.
+
 ### Step 2: Round 1 Review
 
 **Branch by `REVIEWER_BACKEND`:**
