@@ -555,7 +555,8 @@ Create `PAPER_IMPROVEMENT_LOG.md` in the paper directory:
 ## PDFs
 - `main_round0_original.pdf` — Original generated paper
 - `main_round1.pdf` — After Round 1 fixes
-- `main_round2.pdf` — Final version after Round 2 fixes
+- `main_round{k}.pdf` — After Round k fixes, for k = 2 to MAX_ROUNDS
+- `main_round{MAX_ROUNDS}.pdf` — Final version
 ```
 
 ### Step 10: Summary
@@ -578,11 +579,13 @@ After each round's review AND at final completion, check `~/.claude/feishu.json`
 
 ```
 paper/
-├── main_round0_original.pdf    # Original
-├── main_round1.pdf             # After Round 1
-├── main_round2.pdf             # After Round 2 (final)
-├── main.pdf                    # = main_round2.pdf
-└── PAPER_IMPROVEMENT_LOG.md    # Full review log with scores
+├── main_round0_original.pdf         # Original
+├── main_round1.pdf                  # After Round 1
+├── main_round2.pdf                  # After Round 2
+├── ...
+├── main_round{MAX_ROUNDS}.pdf       # After final round
+├── main.pdf                         # = main_round{MAX_ROUNDS}.pdf
+└── PAPER_IMPROVEMENT_LOG.md         # Full review log with scores
 ```
 
 ## Key Rules
