@@ -516,13 +516,13 @@ Create `PAPER_IMPROVEMENT_LOG.md` in the paper directory:
 | Round 1 | Y/10 | No/Almost/Yes | [summary of fixes] |
 | Round 2 | Z/10 | No/Almost/Yes | [summary of fixes] |
 
-## Round 1 Review & Fixes
+## Round N Review & Fixes    ← repeat for N = 1 to MAX_ROUNDS
 
-### Logic Flow Pre-Analysis (Round 1)
-[Full `FLOW_PREPASS_OUTPUT_R1` verbatim — or: `Flow pre-pass failed for Round 1 — proceeding with unchanged reviewer prompt.` if failed — or: `Flow pre-pass disabled (FLOW_PREPASS = false).` if toggled off]
+### Logic Flow Pre-Analysis (Round N)
+[Full `FLOW_PREPASS_OUTPUT_RN` verbatim — or: `Flow pre-pass failed for Round N — proceeding with unchanged reviewer prompt.` if failed — or: `Flow pre-pass disabled (FLOW_PREPASS = false).` if toggled off]
 
 <details>
-<summary>[Backend] Review (Round 1)</summary>
+<summary>[Backend] Review (Round N)</summary>
 
 [Full raw review text, verbatim — from GPT-5.4 xhigh or Claude subagent]
 
@@ -532,25 +532,6 @@ Create `PAPER_IMPROVEMENT_LOG.md` in the paper directory:
 1. [Fix description] — NotebookLM: [notebook name] — [key finding] (if consulted)
 2. [Fix description]
 ...
-
-## Round 2 Review & Fixes
-
-### Logic Flow Pre-Analysis (Round 2)
-[Full `FLOW_PREPASS_OUTPUT_R2` verbatim — or failure/disabled message as above]
-
-<details>
-<summary>[Backend] Review (Round 2)</summary>
-
-[Full raw review text, verbatim]
-
-</details>
-
-### Fixes Implemented
-1. [Fix description] — NotebookLM: [notebook name] — [key finding] (if consulted)
-2. [Fix description]
-...
-
-> **For MAX_ROUNDS > 2:** For each additional round N (Round 3, Round 4, ...), append an analogous `## Round N Review & Fixes` section to this log, prepending `### Logic Flow Pre-Analysis (Round N)` with `FLOW_PREPASS_OUTPUT_RN` (or the appropriate failure/disabled message).
 
 ## PDFs
 - `main_round0_original.pdf` — Original generated paper
