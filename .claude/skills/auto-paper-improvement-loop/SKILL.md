@@ -258,7 +258,7 @@ Ready for submission to Biometrics/Biostatistics/Statistics in Medicine?
 Present the review results and wait for user input:
 
 ```
-📋 Round 1 review complete.
+📋 Round N review complete.
 
 Score: X/10 — [verdict]
 Key weaknesses (by severity):
@@ -371,7 +371,7 @@ mcp__codex__codex-reply:
   model: gpt-5.4
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    [ROUND_2_PROMPT below]
+    [ROUND_N_PROMPT below]
 ```
 
 #### If backend = `subagent`
@@ -396,7 +396,7 @@ Agent:
     2. [Fix 2]: [description]
     ...
 
-    [ROUND_2_PROMPT below]
+    [ROUND_N_PROMPT below]
 ```
 
 #### ROUND_N_PROMPT (shared by both backends, applies to Round 2 and all subsequent rounds)
@@ -507,6 +507,9 @@ Create `PAPER_IMPROVEMENT_LOG.md` in the paper directory:
 
 ## Round 1 Review & Fixes
 
+### Logic Flow Pre-Analysis (Round 1)
+[Full `FLOW_PREPASS_OUTPUT_R1` verbatim — or: `Flow pre-pass failed for Round 1 — proceeding with unchanged reviewer prompt.` if failed — or: `Flow pre-pass disabled (FLOW_PREPASS = false).` if toggled off]
+
 <details>
 <summary>[Backend] Review (Round 1)</summary>
 
@@ -521,6 +524,9 @@ Create `PAPER_IMPROVEMENT_LOG.md` in the paper directory:
 
 ## Round 2 Review & Fixes
 
+### Logic Flow Pre-Analysis (Round 2)
+[Full `FLOW_PREPASS_OUTPUT_R2` verbatim — or failure/disabled message as above]
+
 <details>
 <summary>[Backend] Review (Round 2)</summary>
 
@@ -532,6 +538,8 @@ Create `PAPER_IMPROVEMENT_LOG.md` in the paper directory:
 1. [Fix description] — NotebookLM: [notebook name] — [key finding] (if consulted)
 2. [Fix description]
 ...
+
+> **For MAX_ROUNDS > 2:** For each additional round N (Round 3, Round 4, ...), append an analogous `## Round N Review & Fixes` section to this log, prepending `### Logic Flow Pre-Analysis (Round N)` with `FLOW_PREPASS_OUTPUT_RN` (or the appropriate failure/disabled message).
 
 ## PDFs
 - `main_round0_original.pdf` — Original generated paper
