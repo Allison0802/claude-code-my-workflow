@@ -338,6 +338,10 @@ cp main.pdf main_round1.pdf
 
 Verify: 0 undefined references, 0 undefined citations.
 
+## Round N Loop Body (N = 2 to MAX_ROUNDS)
+
+`N` is the current round number. Execute this section for N = 2, 3, …, MAX_ROUNDS in sequence: re-collect → pre-pass → review → checkpoint → fix → recompile.
+
 ### Step R.0: Re-collect Paper Text (before Round N ≥ 2)
 
 **Applies to:** Every round after the first — before Round 2, before Round 3, ..., before Round MAX_ROUNDS. Runs after the recompile step for Round N-1 and before Step 1.5 (pre-pass) for Round N.
@@ -355,9 +359,9 @@ done > /tmp/paper_full_text.txt
 
 **Failure policy:** If re-collection fails (e.g., missing section file), log `"Re-collection failed before Round N — using stale /tmp/paper_full_text.txt"` to `PAPER_IMPROVEMENT_LOG.md` and proceed with whatever text is at that path. Do not abort.
 
-### Step 5: Round 2 Review
+### Step N.1: Round N Review
 
-**Before this step:** Run Step R.0 (re-collect paper text) then Step 1.5 (logic flow pre-pass, if `FLOW_PREPASS = true`). These generalized procedures apply to every subsequent round (Round 2, Round 3, ..., Round MAX_ROUNDS). For rounds beyond Round 2, repeat the same sequence: recompile → Step R.0 → Step 1.5 → reviewer call.
+**Before this step:** Run Step R.0 (re-collect paper text) then Step 1.5 (logic flow pre-pass, if `FLOW_PREPASS = true`).
 
 **Branch by `REVIEWER_BACKEND`:**
 
