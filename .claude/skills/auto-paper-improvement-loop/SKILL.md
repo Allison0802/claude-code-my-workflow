@@ -357,6 +357,8 @@ done > /tmp/paper_full_text.txt
 
 ### Step 5: Round 2 Review
 
+**Before this step:** Run Step R.0 (re-collect paper text) then Step 1.5 (logic flow pre-pass, if `FLOW_PREPASS = true`). These generalized procedures apply to every subsequent round (Round 2, Round 3, ..., Round MAX_ROUNDS). For rounds beyond Round 2, repeat the same sequence: recompile → Step R.0 → Step 1.5 → reviewer call.
+
 **Branch by `REVIEWER_BACKEND`:**
 
 #### If backend = `codex`
@@ -397,7 +399,7 @@ Agent:
     [ROUND_2_PROMPT below]
 ```
 
-#### ROUND_2_PROMPT (shared by both backends)
+#### ROUND_N_PROMPT (shared by both backends, applies to Round 2 and all subsequent rounds)
 
 ```
 [Round 2 update]
