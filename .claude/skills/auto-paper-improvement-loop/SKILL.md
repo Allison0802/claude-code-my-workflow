@@ -380,7 +380,10 @@ mcp__codex__codex-reply:
 
 #### If backend = `subagent`
 
-Spawn a new subagent with full Round 1 context embedded (since subagents don't persist state):
+Spawn a new subagent with prior review context embedded (since subagents don't persist state).
+For Round N = 2, the "Summaries" block is omitted — degrades gracefully to single-round context.
+Before calling for Round N ≥ 3, read `PAPER_IMPROVEMENT_LOG.md` to extract the score, verdict, and
+fixes-implemented list for rounds 1..N-2. Generate a 3-sentence summary per prior round from that data.
 
 ```
 Agent:
@@ -390,12 +393,16 @@ Agent:
     You are a senior associate editor at Biometrics with expertise in survival analysis,
     recurrent events, competing risks, and semiparametric efficiency theory.
 
-    ## Context: You previously reviewed this paper in Round 1.
+    ## Context: You have reviewed this paper across N-1 previous rounds.
 
-    ### Your Round 1 Review (verbatim):
-    [paste full Round 1 review text]
+    ### Summaries of Rounds 1 through N-2:
+    [Omit this block entirely when N=2. For N≥3, for each round k from 1 to N-2:]
+    **Round k (Score: X/10):** [3-sentence summary: key weaknesses identified + fixes applied]
 
-    ### Fixes Implemented Since Round 1:
+    ### Your Most Recent Review (Round N-1, verbatim):
+    [paste full Round N-1 review text]
+
+    ### Fixes Implemented Since Round N-1:
     1. [Fix 1]: [description]
     2. [Fix 2]: [description]
     ...
