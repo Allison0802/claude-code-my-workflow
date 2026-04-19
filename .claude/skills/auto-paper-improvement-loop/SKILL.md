@@ -453,7 +453,7 @@ TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode main.tex
 BIBINPUTS=..:$BIBINPUTS bibtex main
 TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode main.tex
 TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode main.tex
-cp main.pdf main_round2.pdf
+cp main.pdf main_round${N}.pdf
 ```
 
 ### Step 8: Format Check
