@@ -384,7 +384,7 @@ Spawn a new subagent with full Round 1 context embedded (since subagents don't p
 
 ```
 Agent:
-  description: "Paper review round 2"
+  description: "Paper review round N"
   model: "opus"
   prompt: |
     You are a senior associate editor at Biometrics with expertise in survival analysis,
@@ -406,7 +406,7 @@ Agent:
 #### ROUND_N_PROMPT (shared by both backends, applies to Round 2 and all subsequent rounds)
 
 ```
-[Round 2 update]
+[Round N update]
 
 Since your last review, we have implemented:
 1. [Fix 1]: [description]
