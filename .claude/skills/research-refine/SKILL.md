@@ -66,6 +66,8 @@ Long-running refinement sessions may fail mid-way (e.g., API timeout, context co
   "phase": "review",
   "round": 1,
   "threadId": "019cd392-...",
+  "reviewer_backend": "codex",
+  "user_focus": "focus on frontier leverage over novelty",
   "last_score": 6.5,
   "last_verdict": "REVISE",
   "status": "in_progress",
@@ -79,7 +81,9 @@ Long-running refinement sessions may fail mid-way (e.g., API timeout, context co
 |-------|--------|---------|
 | `phase` | `"anchor"` / `"proposal"` / `"review"` / `"refine"` / `"done"` | Last **completed** phase |
 | `round` | 0–MAX_ROUNDS | Current round number |
-| `threadId` | string or null | Reviewer thread ID for `codex-reply` continuity |
+| `threadId` | string or null | Reviewer thread ID for `codex-reply` continuity (null when `reviewer_backend == "subagent"`) |
+| `reviewer_backend` | `"codex"` or `"subagent"` | Backend used for Phase 2 and all Phase 4 review calls |
+| `user_focus` | string (possibly empty) | Verbatim user focus directive; re-injected into every round prompt |
 | `last_score` | number or null | Most recent overall score from reviewer |
 | `last_verdict` | string or null | Most recent verdict (READY / REVISE / RETHINK) |
 | `status` | `"in_progress"` / `"completed"` | Loop status |
@@ -87,6 +91,7 @@ Long-running refinement sessions may fail mid-way (e.g., API timeout, context co
 
 **Write rules:**
 - **Write after each phase completes** (not before). Overwrite each time — only the latest state matters.
+- **`user_focus` and `reviewer_backend` MUST be included on every checkpoint write.** Post-compact recovery reads both before resuming; missing `user_focus` defaults to `""` (defensive read), missing `reviewer_backend` defaults to `"auto"`.
 - **On completion** (Phase 5 finished), set `"status": "completed"`.
 
 ## Output Structure
