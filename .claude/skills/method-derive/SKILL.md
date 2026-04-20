@@ -84,7 +84,7 @@ Persist to `derive-logs/DERIVE_STATE.json` after each phase boundary:
 |-------|--------|
 | `phase` | `"anchor"` / `"derivation"` / `"math-review"` / `"revision"` / `"simulation"` / `"code-review"` / `"pilot"` / `"slurm"` / `"done"` |
 | `round` | 0–MAX_ROUNDS |
-| `threadId` | Reviewer thread ID for `codex-reply` continuity. **`null` when `reviewer_backend == "subagent"`**; in that case Round N-1 review text is stored in `derive-logs/round-N-1-math-review.md` for Round N context. |
+| `threadId` | Codex: reviewer thread ID for `codex-reply` continuity. Subagent: `null`; Round N-1 review text is stored in `derive-logs/round-N-1-math-review.md` for Round N context. |
 | `reviewer_backend` | `"codex"` / `"subagent"` — records which backend was used. Logged alongside every round. |
 | `user_focus` | Verbatim `USER_FOCUS` string, or `""` if none. Persisted so checkpoint recovery re-injects the same focus into subsequent rounds. |
 | `last_score` | Most recent overall score |
@@ -294,7 +294,7 @@ Agent:
     [REVIEWER_PROMPT below — same text as Codex branch]
 ```
 
-Save the full raw response text to `derive-logs/round-1-math-review.md` inside a `<details>` block. For `subagent` backend, `threadId = null`; Round N (N ≥ 2) will re-read this file for context.
+For `subagent` backend, `threadId = null`; Round N (N ≥ 2) will re-read this file for context.
 
 #### USER_FOCUS injection (shared by both backends)
 
@@ -311,11 +311,11 @@ If `USER_FOCUS` is empty, omit the entire block — the prompt is byte-identical
 
 #### REVIEWER_PROMPT (shared by both backends)
 
-The prompt body — persona, 7-dimension scoring rubric, verdict rules, output format — is unchanged from prior versions. It is the text that already appears below after the `prompt: |` line.
+The prompt body — persona, 7-dimension scoring rubric, verdict rules, output format — is unchanged from prior versions. It is the text that already appears above in the Codex branch after the `prompt: |` line.
 
 **CRITICAL (Codex branch only): Save the `threadId`** from the Codex call for all later rounds. For `subagent` backend, skip this — Round N ≥ 2 re-reads `derive-logs/round-N-1-math-review.md` instead.
 
-Save the full raw response (verbatim) to `derive-logs/round-1-math-review.md` inside a `<details>` block.
+Save the full raw response from whichever backend was used to `derive-logs/round-1-math-review.md` inside a `<details>` block.
 
 **Checkpoint:** Update `DERIVE_STATE.json` with `"phase": "math-review", "round": 1, "threadId": "<saved-or-null>", "reviewer_backend": "<codex|subagent>", "user_focus": "<USER_FOCUS verbatim>", "last_score": <parsed>, "last_verdict": "<parsed>"`.
 
@@ -441,8 +441,6 @@ Agent:
     [ROUND_N_PROMPT below]
 ```
 
-Save the full raw response text to `derive-logs/round-N-math-review.md`.
-
 #### USER_FOCUS injection (shared by both backends, every round N ≥ 2)
 
 If `USER_FOCUS` is non-empty, prepend a `## User Focus (priority — persistent across rounds)` block at the top of `ROUND_N_PROMPT`, **before** the `[Round N re-evaluation]` line. This re-asserts the user's focus in every round even when the Codex thread or subagent summary carries prior context.
@@ -480,7 +478,7 @@ Same output format: 7 scores, overall, verdict, hidden assumptions, drift warnin
 Use CORRECT only if overall >= 9 and no blocking issues remain.
 ```
 
-Save the response to `derive-logs/round-N-math-review.md`.
+Save the response from whichever backend was used to `derive-logs/round-N-math-review.md`.
 
 **Checkpoint:** Update `DERIVE_STATE.json` with `"phase": "math-review", "round": N, "reviewer_backend": "<codex|subagent>", "user_focus": "<USER_FOCUS verbatim>"`.
 
@@ -718,7 +716,7 @@ Suggested next step: /run-experiment
 - **Subagent reviewer requires `model: "opus"`** — the `Agent` tool inherits Sonnet from the parent if `model` is omitted. Always pass `model: "opus"` explicitly for every `Agent` call used as a reviewer fallback in Phase 2 and Phase 4.
 - **Log the reviewer backend** — record which backend was used (`codex` or `subagent`) in both `DERIVE_STATE.json` and `derive-logs/score-history.md` for every round.
 - **USER_FOCUS persists across rounds and compacts.** It is re-injected into the reviewer prompt in every Phase 2 and Phase 4 call, and it is persisted in `DERIVE_STATE.json` so checkpoint recovery re-injects the same focus.
-- **Save `threadId` from Phase 2** and use `mcp__codex__codex-reply` for all subsequent rounds.
+- **Codex branch: save `threadId` from Phase 2** and use `mcp__codex__codex-reply` for all subsequent rounds. **Subagent branch: `threadId = null`**; Round N ≥ 2 re-reads `derive-logs/round-N-1-math-review.md` for prior context instead.
 - **R conventions**: `set.seed(YYYYMMDD)`, `RNGkind("L'Ecuyer-CMRG")` for parallel, `here::here()` for all paths, Okabe-Ito palette for figures, 300 DPI white-background PNG/PDF outputs.
 - **Do not fabricate results.** Pilot results are real; describe only what was actually run.
 
