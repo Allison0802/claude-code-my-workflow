@@ -566,6 +566,10 @@ Save to `refine-logs/round-N-refinement.md`:
 
 ### Phase 4: Re-evaluation (Round 2+)
 
+**Branch by `REVIEWER_BACKEND`** (use whatever was chosen in Phase 2; do **not** re-probe — the backend is locked for the session):
+
+#### If backend = `codex`
+
 Send the revised proposal back to GPT-5.4 in the **same thread**:
 
 ```
@@ -574,36 +578,86 @@ mcp__codex__codex-reply:
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    [Round N re-evaluation]
-
-    I revised the proposal based on your feedback.
-    First, check whether the original Problem Anchor is still preserved.
-    Second, judge whether the method is now more concrete, more focused, and more current.
-
-    Key changes:
-    1. [Method change 1]
-    2. [Method change 2]
-    3. [Simplification / modernization / pushback if any]
-
-    === REVISED PROPOSAL ===
-    [Paste the FULL revised proposal]
-    === END REVISED PROPOSAL ===
-
-    Please:
-    - Re-score the same 7 dimensions and overall
-    - State whether the Problem Anchor is preserved or drifted
-    - State whether the dominant contribution is now sharper or still too broad
-    - State whether the method is simpler or still overbuilt
-    - State whether the frontier leverage is now appropriate or still old-school / forced
-    - Focus new critiques on missing mechanism, weak training signal, weak integration point, pseudo-novelty, or unnecessary complexity
-    - Use the same verdict rule: READY only if overall score >= 9 and no blocking issue remains
-
-    Same output format: 7 scores, overall score, verdict, drift warning, simplification opportunities, modernization opportunities, remaining action items.
+    [ROUND_N_PROMPT below — verbatim]
 ```
 
-Save review to `refine-logs/round-N-review.md`.
+#### If backend = `subagent`
 
-**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "review", "round": N, "threadId": "<saved>", "last_score": <parsed>, "last_verdict": "<parsed>", ...}`.
+Subagents do not persist state, so every Round N ≥ 2 call embeds prior review context. Spawn a new Agent:
+
+```
+Agent:
+  description: "research-refine review round N"
+  subagent_type: "general-purpose"
+  model: "opus"
+  prompt: |
+    You are a senior ML reviewer for a top venue (NeurIPS/ICML/ICLR).
+
+    ## Context: You have reviewed this proposal across N-1 previous rounds.
+
+    ### Summaries of Rounds 1 through N-2:
+    [Omit this block entirely when N = 2. For N >= 3, read each round-k-review.md
+     (k = 1..N-2) and refine-logs/score-history.md, then produce:]
+    **Round k (Score: X/10, Verdict: REVISE|RETHINK|READY):** [3-sentence summary: the
+    top weaknesses identified that round plus the fixes that were applied before Round k+1]
+
+    ### Your Most Recent Review (Round N-1, verbatim):
+    [paste full Round N-1 review text from refine-logs/round-(N-1)-review.md]
+
+    ### Changes Implemented Since Round N-1:
+    1. [method change 1 — from refine-logs/round-(N-1)-refinement.md "Changes Made"]
+    2. [method change 2]
+    ...
+
+    [ROUND_N_PROMPT below — verbatim]
+```
+
+`model: "opus"` is **REQUIRED** for the same reason as Phase 2.
+
+Save the full response for Round N+1 context.
+
+#### ROUND_N_PROMPT (shared by both backends)
+
+**USER_FOCUS re-assertion:** If `USER_FOCUS` is non-empty, prepend a `## User Focus (priority — persistent across rounds)` block at the very top of `ROUND_N_PROMPT`, **before** `[Round N re-evaluation]`. This re-assertion is redundant by design: Codex threads carry prior context and subagent prompts already embed prior reviews, but re-asserting every round guarantees the focus never silently decays across compaction or context reshuffling. If `USER_FOCUS` is empty, omit the block entirely.
+
+```
+## User Focus (priority — persistent across rounds)
+[USER_FOCUS verbatim — omit this entire block if USER_FOCUS is empty]
+
+This focus was specified at the start of the loop and applies to every round.
+Continue scoring the proposal primarily on how well it satisfies this focus.
+
+[Round N re-evaluation]
+
+I revised the proposal based on your feedback.
+First, check whether the original Problem Anchor is still preserved.
+Second, judge whether the method is now more concrete, more focused, and more current.
+
+Key changes:
+1. [Method change 1]
+2. [Method change 2]
+3. [Simplification / modernization / pushback if any]
+
+=== REVISED PROPOSAL ===
+[Paste the FULL revised proposal]
+=== END REVISED PROPOSAL ===
+
+Please:
+- Re-score the same 7 dimensions and overall
+- State whether the Problem Anchor is preserved or drifted
+- State whether the dominant contribution is now sharper or still too broad
+- State whether the method is simpler or still overbuilt
+- State whether the frontier leverage is now appropriate or still old-school / forced
+- If USER_FOCUS is non-empty above, state whether this round adequately addresses it
+- Focus new critiques on missing mechanism, weak training signal, weak integration point, pseudo-novelty, or unnecessary complexity
+- Use the same verdict rule: READY only if overall score >= 9 and no blocking issue remains
+
+Same output format: 7 scores, overall score, verdict, drift warning, simplification opportunities, modernization opportunities, remaining action items.
+```
+
+Save review to `refine-logs/round-N-review.md`. Include a header line `**Backend used:** codex | subagent`.
+
+**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "review", "round": N, "threadId": "<saved or null>", "reviewer_backend": "<codex|subagent>", "user_focus": "<verbatim>", "last_score": <parsed>, "last_verdict": "<parsed>", ...}`.
 
 Then return to Phase 3 until:
 
