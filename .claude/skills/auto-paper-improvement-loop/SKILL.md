@@ -19,17 +19,28 @@ Unlike `/auto-review-loop` (which iterates on **research** — running experimen
 
 ## Constants
 
-- **MAX_ROUNDS = 2** — Two rounds of review→fix→recompile. Round 1 catches structural issues (assumption gaps, simulation design flaws); Round 2 catches presentation and coverage issues.
+- **MAX_ROUNDS = 2** — Default number of review→fix→recompile rounds. Round 1 catches structural issues (assumption gaps, simulation design flaws); Round 2 catches presentation and coverage issues. **Override via argument: `— max rounds: N`** (e.g., `— max rounds: 6` for a deeper polish pass).
 - **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for paper review (ignored when using subagent backend).
 - **REVIEWER_BACKEND = `auto`** — Which reviewer to use. Values: `auto` (detect Codex MCP, fall back to subagent), `codex` (force Codex MCP), `subagent` (force Claude subagent). See **Reviewer Backend** section below.
 - **REVIEW_LOG = `PAPER_IMPROVEMENT_LOG.md`** — Cumulative log of all rounds, stored in paper directory.
 - **HUMAN_CHECKPOINT = false** — When `true`, pause after each round's review and present score + weaknesses to the user. The user can approve fixes, provide custom modification instructions, skip specific fixes, or stop early. When `false` (default), runs fully autonomously.
 - **FLOW_PREPASS = true** — When `true` (default), spawn a logic flow pre-pass subagent before **every** review round (Round 1 through Round MAX_ROUNDS) to produce a section-level and paragraph-level reverse outline. Output is injected into the reviewer prompt as structural scaffolding. When `false`, skip the pre-pass for all rounds; reviewer prompts are byte-identical to current behavior.
+- **USER_FOCUS = ""** — Free-text user directive that biases the reviewer's attention (e.g., "focus on detail balance: what to describe in detail vs trim/move to appendix"). When non-empty, injected verbatim into **every** round's reviewer prompt (Round 1 through Round MAX_ROUNDS) so the user's focus persists across the full loop, not just Round 1. Set from arguments (see parsing below) or omit for the default reviewer behavior.
 - **NOTEBOOKLM_NOTEBOOKS** — Two NotebookLM notebooks consulted during fix implementation for domain accuracy:
   - `0bf80af5-8b8d-423d-b7ef-94b13ad48f7b` — ML for Recurrent Events (pseudo-observation theory, recurrent event methodology, competing risks, C-index)
   - `fea2207b-7ec1-463c-b73f-58c0c4febb41` — Interpretable AI (ML model assumptions, interpretability claims, method comparisons)
 
-> 💡 Override: `/auto-paper-improvement-loop "paper/" — human checkpoint: true, reviewer: subagent, flow prepass: false`
+> 💡 Override: `/auto-paper-improvement-loop "paper/" — max rounds: 6, human checkpoint: true, reviewer: subagent, flow prepass: false, focus: "trim simulation detail; move proofs to appendix"`
+
+### Argument Parsing for USER_FOCUS
+
+`$ARGUMENTS` may contain a mix of (a) the paper directory, (b) recognized parameters (`max rounds:`, `human checkpoint:`, `reviewer:`, `flow prepass:`, `focus:`), and (c) free-text directives. Parse as follows:
+
+1. Extract the paper directory (first quoted path or first token resembling a directory).
+2. Extract recognized parameters by their `key:` prefix.
+3. **Anything left over — including any free-text natural-language directive embedded in the prompt (e.g., "focus on what to describe in detail and what to trim") — is treated as `USER_FOCUS`.** Concatenate and trim whitespace.
+4. If the user explicitly provides `focus: "..."`, that value takes precedence over any free-text leftovers.
+5. Log the parsed `USER_FOCUS` value (or `"(none)"`) to `PAPER_IMPROVEMENT_LOG.md` under "Configuration" so the user can verify it was captured.
 
 **Reviewer fallback & NotebookLM:** When Codex MCP is unavailable, this skill falls back to a Claude subagent reviewer (same biostatistics associate-editor persona). Before implementing CRITICAL/MAJOR fixes, consult NotebookLM for domain accuracy. See `.claude/rules/codex-fallback-protocol.md` for full protocol.
 
@@ -49,9 +60,12 @@ If the context window fills up mid-loop, Claude Code auto-compacts. To recover, 
   "reviewer_backend": "codex",
   "last_score": 6,
   "status": "in_progress",
-  "timestamp": "2026-04-04T21:00:00"
+  "timestamp": "2026-04-04T21:00:00",
+  "user_focus": "focus on detail balance: what to describe in detail vs trim/move to appendix"
 }
 ```
+
+`user_focus` MUST be persisted so post-compact recovery re-injects the same focus into subsequent rounds. If absent on resume, treat as `""`.
 
 > `threadId` is only populated when `reviewer_backend` is `"codex"`. When `"subagent"`, threadId is `null` and the Round 1 review text is stored in the improvement log for Round 2 context.
 
@@ -86,6 +100,8 @@ done > /tmp/paper_full_text.txt
 **Skip entirely if `FLOW_PREPASS = false`.** When skipped, set `FLOW_PREPASS_OUTPUT_RN = ""` and proceed to the reviewer call for Round N with the prompt unchanged.
 
 Spawn a pre-pass subagent. Save the full response as the runtime variable `FLOW_PREPASS_OUTPUT_RN` (where N is the current round number; e.g., `FLOW_PREPASS_OUTPUT_R1` in Round 1, `FLOW_PREPASS_OUTPUT_R3` in Round 3). This variable is **not** persisted to `PAPER_IMPROVEMENT_STATE.json` — it is regenerated fresh each round.
+
+**REQUIRED: dispatch with `model: "opus"`. The Agent tool inherits Sonnet from the parent if `model` is omitted — do not omit it.**
 
 ```
 Agent:
@@ -176,10 +192,19 @@ Save the full review response text for Round 2 context.
 
 #### REVIEWER_PROMPT (shared by both backends)
 
+**USER_FOCUS injection:** If `USER_FOCUS` is non-empty, prepend a `## User Focus (priority)` block immediately before `## Full Paper Text` containing the verbatim `USER_FOCUS` string and the directive: *"Treat this focus as the highest-priority review lens for this round. Score the paper primarily on how well it satisfies this focus, while still flagging any CRITICAL methodological errors you observe."* If `USER_FOCUS` is empty, omit the block — prompt is byte-identical to the prior default.
+
 ```
 You are a senior associate editor at Biometrics with expertise in survival analysis,
 recurrent events, competing risks, and semiparametric efficiency theory.
 Review the following biostatistics methodology paper.
+
+## User Focus (priority)
+[USER_FOCUS verbatim — omit this entire block if USER_FOCUS is empty]
+
+Treat this focus as the highest-priority review lens for this round. Score the paper
+primarily on how well it satisfies this focus, while still flagging any CRITICAL
+methodological errors you observe.
 
 ## Full Paper Text:
 [paste concatenated sections]
@@ -412,7 +437,15 @@ Agent:
 
 #### ROUND_N_PROMPT (shared by both backends, applies to all rounds N ≥ 2)
 
+**USER_FOCUS injection:** If `USER_FOCUS` is non-empty, prepend a `## User Focus (priority — persistent across rounds)` block at the top of `ROUND_N_PROMPT`, **before** the `[Round N update]` line. This ensures the user's focus is re-asserted to the reviewer in every round, even when the conversation thread (Codex) or summary block (subagent) carries forward prior context. If `USER_FOCUS` is empty, omit the block.
+
 ```
+## User Focus (priority — persistent across rounds)
+[USER_FOCUS verbatim — omit this entire block if USER_FOCUS is empty]
+
+This focus was specified at the start of the loop and applies to every round.
+Continue scoring the paper primarily on how well it satisfies this focus.
+
 [Round N update]
 
 Since your last review, we have implemented:
@@ -425,6 +458,7 @@ Score, Summary, Strengths, Weaknesses (CRITICAL/MAJOR/MINOR with fixes),
 Statistical Rigor Checklist, Notation, Missing References, Verdict.
 
 Pay particular attention to:
+- Whether the User Focus directive above has been adequately addressed (if non-empty)
 - Whether regularity conditions and the simulation design now align
 - Whether all CI/coverage claims are backed by table evidence
 - Whether notation is globally consistent
@@ -507,6 +541,8 @@ Create `PAPER_IMPROVEMENT_LOG.md` in the paper directory:
 ## Configuration
 - **Reviewer backend:** codex | subagent
 - **NotebookLM:** available | unavailable
+- **MAX_ROUNDS:** N
+- **USER_FOCUS:** "[verbatim user focus directive, or `(none)` if empty]"
 
 ## Score Progression
 
@@ -571,6 +607,7 @@ paper/
 
 ## Key Rules
 
+- **Pre-pass and reviewer subagents MUST use `model: "opus"`** — the Agent tool inherits Sonnet from the parent if `model` is omitted. Always pass `model: "opus"` explicitly for every Agent call in this skill.
 - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
 - **Compile command**: Use the project XeLaTeX 3-pass sequence (`xelatex → bibtex → xelatex → xelatex`) with `TEXINPUTS=../Preambles:$TEXINPUTS`, not `latexmk`. This project uses XeLaTeX, not pdfLaTeX.
 - **Preserve all PDF versions** — user needs to compare progression
@@ -583,6 +620,7 @@ paper/
 - **Assumption numbers must align** — if Supplement proofs reference "Assumption A3", that label must match the main text exactly
 - **NotebookLM before fixes** — query both notebooks before implementing CRITICAL/MAJOR fixes. If unavailable, proceed without and log the skip. Never let notebook unavailability block the loop.
 - **Log the reviewer backend** — record which backend was used (`codex` or `subagent`) in both `PAPER_IMPROVEMENT_STATE.json` and `PAPER_IMPROVEMENT_LOG.md`
+- **USER_FOCUS persists across all rounds** — when the user provides a focus directive (free-text or via `focus: "..."`), it MUST be injected verbatim into every round's reviewer prompt (Round 1 through Round MAX_ROUNDS), persisted to `PAPER_IMPROVEMENT_STATE.json` for compact recovery, and echoed in the `PAPER_IMPROVEMENT_LOG.md` Configuration block. Do not let the user's focus decay after Round 1 — that defeats the purpose of a multi-round loop tuned to user intent. Fix prioritization within each round must also respect USER_FOCUS: when ranking CRITICAL > MAJOR > MINOR fixes, prefer fixes that advance the user's focus over equally-severe fixes that don't.
 
 ## Typical Score Progression
 
