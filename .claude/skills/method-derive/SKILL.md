@@ -1,6 +1,6 @@
 ---
 name: method-derive
-description: 'Derive new statistical estimators end-to-end: freeze the estimand, write the full mathematical derivation, run an iterative GPT-5.4 review loop until the math is sound, implement the estimator in R, verify it via Monte Carlo pilot (bias ≈ 0, SE ratio ≈ 1, nominal coverage), and generate SLURM job files for a full simulation study. Use whenever the user says "derive this estimator", "show this is unbiased", "prove the variance formula", "design a simulation for this method", "write a simulation script", "check my math on this", or needs to go from a theoretical method idea to working, verified R simulation code. Also triggers on: identification arguments, pseudo-observation regularity, IPW validity, sandwich/jackknife variance, asymptotic normality, DGP design, Monte Carlo performance checks, or any request that combines statistical theory with simulation verification.'
+description: 'Derive new statistical estimators end-to-end: freeze the estimand, write the full mathematical derivation, run an iterative GPT-5.4 review loop until the math is sound, implement the estimator in R, verify it via Monte Carlo pilot (bias ≈ 0, SE ratio ≈ 1, nominal coverage). Use whenever the user says "derive this estimator", "show this is unbiased", "prove the variance formula", "design a simulation for this method", "write a simulation script", "check my math on this", or needs to go from a theoretical method idea to working, verified R simulation code. Also triggers on: identification arguments, pseudo-observation regularity, IPW validity, sandwich/jackknife variance, asymptotic normality, DGP design, Monte Carlo performance checks, or any request that combines statistical theory with simulation verification.'
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Agent, mcp__codex__codex, mcp__codex__codex-reply, mcp__notebooklm__notebook_query
 ---
 
@@ -10,7 +10,7 @@ Derive and verify: **$ARGUMENTS**
 
 ## Overview
 
-Use this skill when a new statistical method needs to be mathematically grounded and computationally verified. The goal is not a bloated theoretical treatise. The goal is a **clean estimand anchor → sound derivation → verified R simulation → SLURM-ready job files** package, all internally consistent.
+Use this skill when a new statistical method needs to be mathematically grounded and computationally verified. The goal is not a bloated theoretical treatise. The goal is a **clean estimand anchor → sound derivation → verified R simulation** package, all internally consistent.
 
 Three principles govern this skill:
 
@@ -29,8 +29,7 @@ Input (ESTIMAND + proposed METHOD)
   -> Phase 5 (Claude):      Write R simulation script
   -> Phase 6 (domain-reviewer agent): Code and design review
   -> Phase 7 (Claude + Bash): Pilot run + Monte Carlo verification
-  -> Phase 8 (Claude):      SLURM job files
-  -> Phase 9:               Final report and summary
+  -> Phase 8:               Final report and summary
 ```
 
 ## Constants
@@ -82,7 +81,7 @@ Persist to `derive-logs/DERIVE_STATE.json` after each phase boundary:
 
 | Field | Values |
 |-------|--------|
-| `phase` | `"anchor"` / `"derivation"` / `"math-review"` / `"revision"` / `"simulation"` / `"code-review"` / `"pilot"` / `"slurm"` / `"done"` |
+| `phase` | `"anchor"` / `"derivation"` / `"math-review"` / `"revision"` / `"simulation"` / `"code-review"` / `"pilot"` / `"done"` |
 | `round` | 0–MAX_ROUNDS |
 | `threadId` | Codex: reviewer thread ID for `codex-reply` continuity. Subagent: `null`; Round N-1 review text is stored in `derive-logs/round-N-1-math-review.md` for Round N context. |
 | `reviewer_backend` | `"codex"` / `"subagent"` — records which backend was used. Logged alongside every round. |
@@ -108,8 +107,6 @@ derive-logs/
 ├── FINAL_DERIVATION.md
 ├── simulation.R
 ├── pilot_results.md
-├── run_full.slurm
-├── run_instructions.md
 ├── DERIVATION_REPORT.md
 └── score-history.md
 ```
@@ -607,71 +604,25 @@ Save `derive-logs/pilot_results.md`:
 
 ---
 
-### Phase 8: SLURM Job Files
+### Phase 8: Final Report
 
-Generate `derive-logs/run_full.slurm` for UNC Longleaf. Base array size, cores, memory, and wall time on the pilot timing.
-
-```bash
-#!/bin/bash
-#SBATCH --job-name=sim_[estimand_shortname]
-#SBATCH --array=1-[N_SCENARIOS]
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=[CORES]
-#SBATCH --mem=[MEM]GB
-#SBATCH --time=[HH:MM:SS]
-#SBATCH --output=logs/slurm_%A_%a.out
-#SBATCH --error=logs/slurm_%A_%a.err
-#SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=[user@email.edu]
-
-module load r/4.4.0
-mkdir -p logs results
-
-Rscript derive-logs/simulation.R --scenario $SLURM_ARRAY_TASK_ID
-```
-
-Also write `derive-logs/run_instructions.md`:
-
-```markdown
-# Run Instructions
-
-## Submit
-sbatch derive-logs/run_full.slurm
-
-## Monitor
-squeue -u $USER
-sacct -j [JOBID] --format=JobID,State,ExitCode,Elapsed
-
-## Collect Results
-# [describe how to aggregate output CSVs after all array tasks finish]
-
-## Analyze Results
-/analyze-results derive-logs/results/
-```
-
-**Checkpoint:** Update `DERIVE_STATE.json` with `"phase": "slurm"`.
-
----
-
-### Phase 9: Final Report
-
-#### 9.1 `derive-logs/MATH_REVIEW_SUMMARY.md`
+#### 8.1 `derive-logs/MATH_REVIEW_SUMMARY.md`
 
 High-level round-by-round record: what was wrong each round, what changed, what was resolved.
 
 Include: Estimand Anchor (verbatim), round-by-round resolution table, final status (estimand preserved / assumption set minimal / derivation sound).
 
-#### 9.2 `derive-logs/FINAL_DERIVATION.md`
+#### 8.2 `derive-logs/FINAL_DERIVATION.md`
 
 Clean final derivation only — no review chatter, no revision history.
 
 If the final verdict is not CORRECT, still write the best current version and flag remaining concerns.
 
-#### 9.3 `derive-logs/DERIVATION_REPORT.md`
+#### 8.3 `derive-logs/DERIVATION_REPORT.md`
 
 Full report: score evolution table, round-by-round change log, pushback/drift log, pilot verification summary, remaining weaknesses (honest), raw reviewer responses in `<details>` blocks, next steps.
 
-#### 9.4 Present Summary
+#### 8.4 Present Summary
 
 ```
 Method derivation complete after N rounds.
@@ -693,7 +644,6 @@ Files:
   derive-logs/FINAL_DERIVATION.md
   derive-logs/simulation.R
   derive-logs/pilot_results.md
-  derive-logs/run_full.slurm
   derive-logs/DERIVATION_REPORT.md
 
 Suggested next step: /run-experiment
@@ -710,7 +660,6 @@ Suggested next step: /run-experiment
 - **Show every step.** "It follows that..." is not acceptable — write the algebra.
 - **Minimal assumptions win.** Do not add a condition that is not needed by any derivation step.
 - **Theory and code must match.** Variable names in R should mirror mathematical notation.
-- **Pilot before SLURM.** Never generate a SLURM submission without a passing pilot.
 - **Distinguish code bugs from theory errors.** A bias failure in the pilot is not automatically a theory problem — diagnose carefully.
 - **ALWAYS use `config: {"model_reasoning_effort": "xhigh"}`** for all Codex calls.
 - **Subagent reviewer requires `model: "opus"`** — the `Agent` tool inherits Sonnet from the parent if `model` is omitted. Always pass `model: "opus"` explicitly for every `Agent` call used as a reviewer fallback in Phase 2 and Phase 4.
@@ -731,9 +680,9 @@ This skill bridges theory and full-scale simulation:
 /proof-writer "specific claim"           -> rigorous proof of one theorem (single-pass, no code)
 
 /method-derive "ESTIMAND: ... | METHOD: ..."   <- you are here
-  Outputs: FINAL_DERIVATION.md, simulation.R, pilot_results.md, run_full.slurm
+  Outputs: FINAL_DERIVATION.md, simulation.R, pilot_results.md
 
-/run-experiment derive-logs/run_full.slurm    -> submit and monitor the full SLURM run
+/run-experiment <slurm-file>                  -> submit and monitor the full SLURM run (SLURM file is user-provided)
 /analyze-results derive-logs/results/         -> summarize Monte Carlo results
 /paper-write methods                          -> integrate FINAL_DERIVATION.md into manuscript
 ```

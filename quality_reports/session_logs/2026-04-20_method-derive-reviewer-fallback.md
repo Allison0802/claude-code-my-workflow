@@ -13,3 +13,4 @@ Eight surgical edits to `.claude/skills/method-derive/SKILL.md`. Phase 6 and lat
 
 ## Changes
 - [17:33] .claude/skills/method-derive/SKILL.md — added REVIEWER_BACKEND + USER_FOCUS with math-review-loop subagent fallback; Phase 6 domain-reviewer unchanged.
+- [17:55] .claude/skills/method-derive/SKILL.md — deleted Phase 8 (SLURM job files) as out-of-scope for method derivation; renumbered Phase 9 → Phase 8 (Final Report) with subsections 8.1–8.4; pruned SLURM refs from overview sentence, workflow box, state-schema enum, output tree, description frontmatter, Key Rules, and Composing-with-Other-Skills section.
