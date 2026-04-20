@@ -41,8 +41,21 @@ User input (PROBLEM + vague APPROACH)
 - **MAX_CORE_EXPERIMENTS = 3** — Default cap for core validation blocks inside this skill.
 - **MAX_PRIMARY_CLAIMS = 2** — Soft cap for paper-level claims. Prefer one dominant claim plus one supporting claim.
 - **MAX_NEW_TRAINABLE_COMPONENTS = 2** — Soft cap for genuinely new trainable pieces. Exceed only if the paper breaks otherwise.
+- **REVIEWER_BACKEND = `auto`** — Which reviewer to use. Values: `auto` (detect Codex MCP, fall back to subagent), `codex` (force Codex MCP), `subagent` (force Claude subagent). See **Reviewer Backend** branching in Phase 2 and Phase 4.
+- **USER_FOCUS = `""`** — Free-text user directive that biases the reviewer's attention (e.g., `"focus on frontier leverage over novelty"`, `"prioritize simplification"`). When non-empty, injected verbatim into **every** round's reviewer prompt (Round 1 through Round MAX_ROUNDS). Set from arguments (see parsing below).
 
-> Override via argument if needed, e.g. `/research-refine "problem | approach" -- max rounds: 3, threshold: 9`.
+> Override via argument if needed, e.g. `/research-refine "problem | approach" -- max rounds: 3, threshold: 9, reviewer: subagent, focus: "prioritize simplification over added machinery"`.
+
+**Reviewer fallback & NotebookLM:** When Codex MCP is unavailable, this skill falls back to a Claude subagent reviewer (same top-venue ML reviewer persona). Before implementing CRITICAL reviewer action items in Phase 3, consult NotebookLM for domain accuracy when the criticism maps to survival analysis, pseudo-observation theory, recurrent events, competing risks, C-index, ML model assumptions, or interpretability claims. See `.claude/rules/codex-fallback-protocol.md` for the full shared protocol.
+
+### Argument Parsing for USER_FOCUS and REVIEWER_BACKEND
+
+`$ARGUMENTS` may contain (a) the problem / approach block, (b) recognized parameters (`max rounds:`, `threshold:`, `reviewer:`, `focus:`), and (c) free-text directives. Parse as follows:
+
+1. Extract recognized parameters by their `key:` prefix. Valid `reviewer:` values are `auto`, `codex`, `subagent` (anything else → log a warning and fall back to `auto`).
+2. **Anything left over — including free-text directives like "focus on representation design" — is treated as `USER_FOCUS`.** Concatenate and trim whitespace.
+3. If the user explicitly provides `focus: "..."`, that value takes precedence over any free-text leftovers.
+4. Log the parsed `USER_FOCUS` value (or `(none)`) and `REVIEWER_BACKEND` to `refine-logs/REFINEMENT_REPORT.md` under a `## Configuration` block (added in Phase 5) so the user can verify capture.
 
 ## State Persistence (Checkpoint Recovery)
 
