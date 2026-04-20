@@ -113,6 +113,8 @@ refine-logs/
 
 Every `round-N-refinement.md` must contain a **full anchored proposal**, not just incremental fixes.
 
+`REFINE_STATE.json` persists `reviewer_backend` and `user_focus` on every checkpoint; `REFINEMENT_REPORT.md` surfaces both under a `## Configuration` block.
+
 ## Workflow
 
 ### Initialization (Checkpoint Recovery)
@@ -729,6 +731,13 @@ If the final verdict is not READY, still write the best current final version he
 **Final Score**: X / 10
 **Final Verdict**: [READY / REVISE / RETHINK]
 
+## Configuration
+- **Reviewer backend:** codex | subagent
+- **NotebookLM:** available | unavailable
+- **MAX_ROUNDS:** N
+- **SCORE_THRESHOLD:** X
+- **USER_FOCUS:** "[verbatim user focus directive, or `(none)` if empty]"
+
 ## Problem Anchor
 [Verbatim anchor used across all rounds]
 
@@ -769,9 +778,9 @@ If the final verdict is not READY, still write the best current final version he
 ## Raw Reviewer Responses
 
 <details>
-<summary>Round 1 Review</summary>
+<summary>Round 1 Review (backend: codex | subagent)</summary>
 
-[Full verbatim response from GPT-5.4]
+[Full verbatim response from GPT-5.4 or Claude subagent]
 
 </details>
 
@@ -835,6 +844,10 @@ Suggested next step: /experiment-plan
 - **Do not fabricate results.** Only describe expected evidence and planned experiments.
 - **Be specific about compute and data assumptions.** Vague "we'll train a model" is not enough.
 - **Document everything.** Save every raw review, every anchor check, every simplicity check, and every major method change.
+- **Subagent `model: "opus"` is MANDATORY.** The Agent tool inherits Sonnet from the parent when `model` is omitted, which silently degrades review quality. Never omit.
+- **`user_focus` and `reviewer_backend` MUST be written on every `REFINE_STATE.json` checkpoint.** On post-compact resume, read both before entering Phase 3 or Phase 4; missing `user_focus` defaults to `""` and missing `reviewer_backend` defaults to `"auto"`.
+- **USER_FOCUS is re-injected into every round's reviewer prompt**, even when thread context (Codex) or embedded summary (subagent) already carries it. Belt-and-suspenders: the focus must never silently decay across rounds.
+- **NotebookLM is silent-skip on failure.** If `mcp__notebooklm__notebook_query` errors or is unavailable during Phase 3.1b, log once and continue applying fixes. Never abort the loop for a notebook miss.
 
 ## Composing with Other Skills
 
