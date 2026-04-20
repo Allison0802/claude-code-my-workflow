@@ -474,6 +474,26 @@ Update `refine-logs/score-history.md`:
 
 **STOP CONDITION**: If overall score >= SCORE_THRESHOLD, verdict is READY, and there is no unresolved drift warning, skip to Phase 5.
 
+#### Step 3.1b: Ground CRITICAL Items in NotebookLM (optional)
+
+For each reviewer action item tagged **CRITICAL** whose subject touches survival analysis, pseudo-observation theory, recurrent events, competing risks, C-index, ML model assumptions, or interpretability claims:
+
+1. Pick the matching notebook:
+   - `0bf80af5-8b8d-423d-b7ef-94b13ad48f7b` — ML for Recurrent Events
+   - `fea2207b-7ec1-463c-b73f-58c0c4febb41` — Interpretable AI
+2. Call `mcp__notebooklm__notebook_query` with a **targeted question** derived from the criticism (not a generic prompt). Example:
+   ```
+   mcp__notebooklm__notebook_query:
+     notebook_id: "0bf80af5-8b8d-423d-b7ef-94b13ad48f7b"
+     query: "Under censoring, is the pseudo-observation estimator for CIF unbiased when the censoring distribution is conditional on covariates?"
+   ```
+3. Use the response to verify theoretical soundness of the planned revision **before** applying it.
+4. Log `Fix grounded in NotebookLM: [notebook name] — [key finding]` next to that fix in the round refinement file (Step 3.2 output).
+
+**Fallback:** If the NotebookLM tool errors, times out, or is unavailable, log `"NotebookLM unavailable — changes applied without notebook consultation"` once per round and continue. Do **not** retry; do **not** abort.
+
+If no reviewer items match the domain gate above, skip this step silently.
+
 #### Step 3.2: Revise With an Anchor Check and a Simplicity Check
 
 Before changing anything:
