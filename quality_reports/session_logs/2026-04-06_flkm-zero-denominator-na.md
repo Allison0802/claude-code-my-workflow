@@ -32,3 +32,7 @@ In both `.flkm_survival_one_group_details()` and `.flkm_survival_one_group()`:
 ## Next Step
 
 Sync functions.R to Longleaf, delete old first-pass RDS, resubmit first-pass validation.
+
+---
+**Context compaction (manual) at 23:56**
+Check git log and quality_reports/plans/ for current state.

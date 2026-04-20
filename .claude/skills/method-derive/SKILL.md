@@ -45,10 +45,22 @@ Input (ESTIMAND + proposed METHOD)
 - **SE_RATIO_RANGE = [0.90, 1.10]** — acceptable mean(SE_hat) / SD(theta_hat)
 - **COVERAGE_NOMINAL = 0.95**
 - **COVERAGE_PILOT_RANGE = [0.91, 0.99]** — Monte Carlo tolerance at B = 500
+- **REVIEWER_BACKEND = `auto`** — Which reviewer to use for the math review loop (Phase 2 & Phase 4). Values: `auto` (detect Codex MCP at startup, fall back to Claude subagent), `codex` (force Codex MCP), `subagent` (force Claude subagent). See `.claude/rules/codex-fallback-protocol.md`. Phase 6's `domain-reviewer` agent is unaffected.
+- **USER_FOCUS = `""`** — Free-text user directive that biases the math reviewer's attention (e.g., "scrutinize the sandwich variance derivation most heavily"). When non-empty, injected verbatim into **every** round's reviewer prompt (Phase 2 Round 1 through Phase 4 Round MAX_ROUNDS) so the user's focus persists across the full loop. Set via arguments (see parsing below) or omit for default reviewer behavior.
 
-> Override constants via argument if needed, e.g. `-- pilot_n: 100, pilot_reps: 200`.
+> Override constants via argument if needed, e.g. `-- pilot_n: 100, pilot_reps: 200, reviewer: subagent, focus: "scrutinize the sandwich variance derivation most heavily"`.
 
-**Reviewer fallback & NotebookLM:** When Codex MCP is unavailable, this skill falls back to a Claude subagent reviewer — **always use `model: "opus"`** in the Agent call. Before implementing CRITICAL/MAJOR changes from reviews, consult NotebookLM. See `.claude/rules/codex-fallback-protocol.md` for full protocol.
+### Argument Parsing for USER_FOCUS
+
+`$ARGUMENTS` may contain a mix of (a) the estimand/method specification, (b) recognized parameters (`pilot_n:`, `pilot_reps:`, `reviewer:`, `focus:`, etc.), and (c) free-text directives. Parse as follows:
+
+1. Extract the estimand/method specification (the `ESTIMAND: … | METHOD: …` block or equivalent).
+2. Extract recognized parameters by their `key:` prefix.
+3. **Anything left over — including any free-text natural-language directive (e.g., "focus on the variance step") — is treated as `USER_FOCUS`.** Concatenate and trim whitespace.
+4. If the user explicitly provides `focus: "..."`, that value takes precedence over any free-text leftovers.
+5. Log the parsed `USER_FOCUS` value (or `"(none)"`) to `derive-logs/score-history.md` under a "Configuration" block so the user can verify it was captured.
+
+**Reviewer fallback & NotebookLM:** The math review loop (Phase 2 & Phase 4) respects `REVIEWER_BACKEND`. Under `auto` (default), probe Codex MCP once at startup; if unavailable, fall back to a Claude subagent reviewer with `model: "opus"` (explicit — never omit). Log `"Reviewer backend: codex"` or `"Reviewer backend: subagent (Codex MCP unavailable)"` to `derive-logs/score-history.md`. Before implementing CRITICAL/MAJOR changes from reviews, consult NotebookLM. Phase 6's `domain-reviewer` agent is unaffected by `REVIEWER_BACKEND`. See `.claude/rules/codex-fallback-protocol.md` for full protocol.
 
 ## State Persistence (Checkpoint Recovery)
 
@@ -59,6 +71,8 @@ Persist to `derive-logs/DERIVE_STATE.json` after each phase boundary:
   "phase": "anchor",
   "round": 0,
   "threadId": null,
+  "reviewer_backend": "codex",
+  "user_focus": "",
   "last_score": null,
   "last_verdict": null,
   "status": "in_progress",
@@ -70,7 +84,9 @@ Persist to `derive-logs/DERIVE_STATE.json` after each phase boundary:
 |-------|--------|
 | `phase` | `"anchor"` / `"derivation"` / `"math-review"` / `"revision"` / `"simulation"` / `"code-review"` / `"pilot"` / `"slurm"` / `"done"` |
 | `round` | 0–MAX_ROUNDS |
-| `threadId` | Reviewer thread ID for `codex-reply` continuity |
+| `threadId` | Reviewer thread ID for `codex-reply` continuity. **`null` when `reviewer_backend == "subagent"`**; in that case Round N-1 review text is stored in `derive-logs/round-N-1-math-review.md` for Round N context. |
+| `reviewer_backend` | `"codex"` / `"subagent"` — records which backend was used. Logged alongside every round. |
+| `user_focus` | Verbatim `USER_FOCUS` string, or `""` if none. Persisted so checkpoint recovery re-injects the same focus into subsequent rounds. |
 | `last_score` | Most recent overall score |
 | `last_verdict` | `CORRECT` / `REVISE` / `REDERIVE` |
 | `status` | `"in_progress"` / `"completed"` |
@@ -186,6 +202,10 @@ Use this structure in `round-0-derivation.md`:
 
 ### Phase 2: External Math Review (Round 1)
 
+**Branch by `REVIEWER_BACKEND`.** Both branches use the same `REVIEWER_PROMPT` (defined below, with the optional `## User Focus (priority)` block prepended when `USER_FOCUS` is non-empty).
+
+#### If backend = `codex`
+
 Send the full derivation to GPT-5.4:
 
 ```
@@ -262,11 +282,42 @@ mcp__codex__codex:
     - REDERIVE: a fundamental step (identification, key expectation, variance structure) is wrong.
 ```
 
-**CRITICAL: Save the `threadId`** from this call for all later rounds.
+#### If backend = `subagent`
+
+Spawn a Claude subagent with the **same persona and prompt** as the Codex branch. `model: "opus"` is REQUIRED — never omit it (the `Agent` tool inherits Sonnet from the parent otherwise):
+
+```
+Agent:
+  description: "method-derive math review round 1"
+  model: "opus"
+  prompt: |
+    [REVIEWER_PROMPT below — same text as Codex branch]
+```
+
+Save the full raw response text to `derive-logs/round-1-math-review.md` inside a `<details>` block. For `subagent` backend, `threadId = null`; Round N (N ≥ 2) will re-read this file for context.
+
+#### USER_FOCUS injection (shared by both backends)
+
+If `USER_FOCUS` is non-empty, prepend a `## User Focus (priority)` block immediately **before** the `=== DERIVATION ===` line inside REVIEWER_PROMPT:
+
+```
+## User Focus (priority)
+[USER_FOCUS verbatim — omit this entire block if USER_FOCUS is empty]
+
+Treat this focus as the highest-priority review lens for this round. Score the derivation primarily on how well it satisfies this focus (weight the 7-dimension scoring accordingly), while still flagging any CRITICAL mathematical errors you observe in other dimensions.
+```
+
+If `USER_FOCUS` is empty, omit the entire block — the prompt is byte-identical to the pre-change version.
+
+#### REVIEWER_PROMPT (shared by both backends)
+
+The prompt body — persona, 7-dimension scoring rubric, verdict rules, output format — is unchanged from prior versions. It is the text that already appears below after the `prompt: |` line.
+
+**CRITICAL (Codex branch only): Save the `threadId`** from the Codex call for all later rounds. For `subagent` backend, skip this — Round N ≥ 2 re-reads `derive-logs/round-N-1-math-review.md` instead.
 
 Save the full raw response (verbatim) to `derive-logs/round-1-math-review.md` inside a `<details>` block.
 
-**Checkpoint:** Update `DERIVE_STATE.json` with `"phase": "math-review", "round": 1, "threadId": "<saved>", "last_score": <parsed>, "last_verdict": "<parsed>"`.
+**Checkpoint:** Update `DERIVE_STATE.json` with `"phase": "math-review", "round": 1, "threadId": "<saved-or-null>", "reviewer_backend": "<codex|subagent>", "user_focus": "<USER_FOCUS verbatim>", "last_score": <parsed>, "last_verdict": "<parsed>"`.
 
 ---
 
@@ -344,7 +395,11 @@ Save to `derive-logs/round-N-revision.md`:
 
 ### Phase 4: Re-evaluation (Round 2+)
 
-Send the revised derivation in the **same thread**:
+**Branch by `REVIEWER_BACKEND`.** Both branches send the same `ROUND_N_PROMPT` (defined below, with the optional `## User Focus (priority — persistent across rounds)` block prepended when `USER_FOCUS` is non-empty).
+
+#### If backend = `codex`
+
+Send the revised derivation in the **same thread** using the saved `threadId`:
 
 ```
 mcp__codex__codex-reply:
@@ -352,29 +407,82 @@ mcp__codex__codex-reply:
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    [Round N re-evaluation]
-
-    I revised the derivation based on your feedback.
-    First, verify the Estimand Anchor is still preserved.
-    Focus new critiques on any remaining math errors, gaps, or unstated assumptions.
-
-    Key changes:
-    1. [Change 1 — section, what was wrong, what was corrected]
-    2. [Change 2]
-    3. [Pushback if any — what was rejected and why]
-
-    === REVISED DERIVATION ===
-    [Paste full revised derivation]
-    === END REVISED DERIVATION ===
-
-    Re-score all 7 dimensions and provide updated overall score and verdict.
-    Same output format: 7 scores, overall, verdict, hidden assumptions, drift warning.
-    Use CORRECT only if overall >= 9 and no blocking issues remain.
+    [ROUND_N_PROMPT below]
 ```
 
-Save to `derive-logs/round-N-math-review.md`.
+#### If backend = `subagent`
 
-**Checkpoint:** Update `DERIVE_STATE.json` with `"phase": "math-review", "round": N`.
+Spawn a **new** subagent with prior round context embedded (subagents don't persist state). `model: "opus"` is REQUIRED:
+
+```
+Agent:
+  description: "method-derive math review round N"
+  model: "opus"
+  prompt: |
+    You are a top-journal referee (Biostatistics, JASA, Statistics in Medicine)
+    with deep expertise in survival analysis, semiparametric estimation, recurrent
+    event methods, missing data, and pseudo-observation theory.
+
+    ## Context: You have reviewed this derivation across N-1 previous rounds.
+
+    ### Summaries of Rounds 1 through N-2:
+    [Omit this block entirely when N=2. For N ≥ 3, for each round k from 1 to N-2:
+    read `derive-logs/score-history.md` and `derive-logs/round-k-revision.md` to build
+    a 3-sentence summary: score, key gaps identified, corrections applied.]
+
+    ### Your Most Recent Review (Round N-1, verbatim):
+    [paste full text of `derive-logs/round-(N-1)-math-review.md`]
+
+    ### Revisions Implemented Since Round N-1:
+    1. [Correction 1 — section, what was wrong, what was corrected]
+    2. [Correction 2]
+    3. [Pushback if any — what was rejected and why]
+
+    [ROUND_N_PROMPT below]
+```
+
+Save the full raw response text to `derive-logs/round-N-math-review.md`.
+
+#### USER_FOCUS injection (shared by both backends, every round N ≥ 2)
+
+If `USER_FOCUS` is non-empty, prepend a `## User Focus (priority — persistent across rounds)` block at the top of `ROUND_N_PROMPT`, **before** the `[Round N re-evaluation]` line. This re-asserts the user's focus in every round even when the Codex thread or subagent summary carries prior context.
+
+```
+## User Focus (priority — persistent across rounds)
+[USER_FOCUS verbatim — omit this entire block if USER_FOCUS is empty]
+
+This focus was specified at the start of the derivation loop and applies to every round.
+Continue scoring the derivation primarily on how well it satisfies this focus (weight the 7-dimension scoring accordingly), while still flagging any CRITICAL mathematical errors in other dimensions.
+```
+
+If `USER_FOCUS` is empty, omit the entire block.
+
+#### ROUND_N_PROMPT (shared by both backends, applies to all rounds N ≥ 2)
+
+```
+[Round N re-evaluation]
+
+I revised the derivation based on your feedback.
+First, verify the Estimand Anchor is still preserved.
+Focus new critiques on any remaining math errors, gaps, or unstated assumptions.
+
+Key changes:
+1. [Change 1 — section, what was wrong, what was corrected]
+2. [Change 2]
+3. [Pushback if any — what was rejected and why]
+
+=== REVISED DERIVATION ===
+[Paste full revised derivation]
+=== END REVISED DERIVATION ===
+
+Re-score all 7 dimensions and provide updated overall score and verdict.
+Same output format: 7 scores, overall, verdict, hidden assumptions, drift warning.
+Use CORRECT only if overall >= 9 and no blocking issues remain.
+```
+
+Save the response to `derive-logs/round-N-math-review.md`.
+
+**Checkpoint:** Update `DERIVE_STATE.json` with `"phase": "math-review", "round": N, "reviewer_backend": "<codex|subagent>", "user_focus": "<USER_FOCUS verbatim>"`.
 
 Return to Phase 3 until overall >= SCORE_THRESHOLD and verdict is CORRECT, or MAX_ROUNDS reached.
 
@@ -607,6 +715,9 @@ Suggested next step: /run-experiment
 - **Pilot before SLURM.** Never generate a SLURM submission without a passing pilot.
 - **Distinguish code bugs from theory errors.** A bias failure in the pilot is not automatically a theory problem — diagnose carefully.
 - **ALWAYS use `config: {"model_reasoning_effort": "xhigh"}`** for all Codex calls.
+- **Subagent reviewer requires `model: "opus"`** — the `Agent` tool inherits Sonnet from the parent if `model` is omitted. Always pass `model: "opus"` explicitly for every `Agent` call used as a reviewer fallback in Phase 2 and Phase 4.
+- **Log the reviewer backend** — record which backend was used (`codex` or `subagent`) in both `DERIVE_STATE.json` and `derive-logs/score-history.md` for every round.
+- **USER_FOCUS persists across rounds and compacts.** It is re-injected into the reviewer prompt in every Phase 2 and Phase 4 call, and it is persisted in `DERIVE_STATE.json` so checkpoint recovery re-injects the same focus.
 - **Save `threadId` from Phase 2** and use `mcp__codex__codex-reply` for all subsequent rounds.
 - **R conventions**: `set.seed(YYYYMMDD)`, `RNGkind("L'Ecuyer-CMRG")` for parallel, `here::here()` for all paths, Okabe-Ito palette for figures, 300 DPI white-background PNG/PDF outputs.
 - **Do not fabricate results.** Pilot results are real; describe only what was actually run.

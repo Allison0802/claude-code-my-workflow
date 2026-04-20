@@ -36,3 +36,19 @@ Used /research-refine with 3 rounds of subagent review (Codex MCP unavailable) t
 - Closed-form variance σ_k^2 (influence function not derived)
 - CLT is Conjecture 1, not Theorem (needs influence function)
 - Clipped DR implementation not covered by theory
+
+---
+**Context compaction (auto) at 01:07**
+Check git log and quality_reports/plans/ for current state.
+
+---
+**Context compaction (manual) at 01:09**
+Check git log and quality_reports/plans/ for current state.
+
+---
+**Context compaction (auto) at 10:22**
+Check git log and quality_reports/plans/ for current state.
+
+---
+**Context compaction (auto) at 14:57**
+Check git log and quality_reports/plans/ for current state.
