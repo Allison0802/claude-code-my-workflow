@@ -157,7 +157,7 @@ Write:
 
 If later reviewer feedback would change the problem being solved, mark that as **drift** and push back or adapt carefully.
 
-**Checkpoint:** Write `refine-logs/REFINE_STATE.json` with `{"phase": "anchor", "round": 0, "threadId": null, "last_score": null, "last_verdict": null, "status": "in_progress", "timestamp": "<now>"}`.
+**Checkpoint:** Write `refine-logs/REFINE_STATE.json` with `{"phase": "anchor", "round": 0, "threadId": null, "reviewer_backend": "<auto|codex|subagent>", "user_focus": "<verbatim or empty>", "last_score": null, "last_verdict": null, "status": "in_progress", "timestamp": "<now>"}`.
 
 ### Phase 1: Build the Initial Proposal
 
@@ -331,7 +331,7 @@ Use this structure:
 - Timeline:
 ```
 
-**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "proposal", "round": 0, ...}`.
+**Checkpoint:** Update `refine-logs/REFINE_STATE.json` with `{"phase": "proposal", "round": 0, "threadId": null, "reviewer_backend": "<auto|codex|subagent>", "user_focus": "<verbatim or empty>", ...}`.
 
 ### Phase 2: External Method Review (Round 1)
 
