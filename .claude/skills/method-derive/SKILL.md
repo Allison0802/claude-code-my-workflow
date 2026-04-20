@@ -210,73 +210,7 @@ mcp__codex__codex:
   model: REVIEWER_MODEL
   config: {"model_reasoning_effort": "xhigh"}
   prompt: |
-    You are a top-journal referee (Biostatistics, JASA, Statistics in Medicine)
-    with deep expertise in survival analysis, semiparametric estimation, recurrent
-    event methods, missing data, and pseudo-observation theory.
-
-    This is an early-stage mathematical derivation of a new statistical estimator.
-
-    Your job is to stress-test whether:
-    (1) The estimand is precisely defined and the derivation targets it exactly.
-    (2) All identifying assumptions are explicitly stated and are sufficient.
-    (3) Every algebraic and probabilistic step is mathematically valid.
-    (4) The identification argument is complete and non-circular.
-    (5) The variance/SE formula is correctly derived and consistently estimable.
-
-    Review principles:
-    - Prefer the minimal necessary assumption set. If an assumption is unnecessary,
-      flag it as over-stated, not as missing.
-    - Flag every gap in reasoning, even if the conclusion is probably correct.
-    - Make implicit assumptions explicit rather than assuming the author intended them.
-    - Do not suggest alternative estimands or methods unless the derivation is
-      fundamentally broken.
-    - Drift: if the derivation implicitly estimates something other than the stated
-      estimand, call it out explicitly.
-
-    === DERIVATION ===
-    [Paste FULL derivation from Phase 1]
-    === END DERIVATION ===
-
-    Score these 7 dimensions from 1–10:
-
-    1. **Estimand Fidelity** (15%): Is the target quantity precisely defined?
-       Does the estimator provably estimate exactly that quantity?
-
-    2. **Assumption Sufficiency** (20%): Are all identifying assumptions explicitly
-       stated? Are they the minimal necessary set? Any hidden conditions?
-
-    3. **Mathematical Correctness** (25%): Are all algebraic, probabilistic, and
-       calculus steps valid? Are expectations, variances, and limits correct?
-
-    4. **Identification Completeness** (15%): Is the argument from model + assumptions
-       to estimability complete, non-circular, and free of logical gaps?
-
-    5. **Variance and SE Validity** (15%): Is the variance formula correctly derived?
-       Is the proposed SE estimator consistent? Does it account for data structure
-       (clustering, censoring, correlation, plug-in components)?
-
-    6. **Simulation Coherence** (5%): Does the described DGP faithfully instantiate
-       the model assumptions, making the claimed properties verifiable?
-
-    7. **Regularity Conditions** (5%): For asymptotic results, are the relevant
-       regularity conditions checked, cited, or explicitly assumed?
-
-    **OVERALL SCORE** (1–10): Weighted average using the percentages above.
-
-    For each dimension scoring < 7, provide:
-    - The specific gap or error (quote the exact step or equation)
-    - A concrete correction (corrected equation, missing assumption statement, etc.)
-    - Priority: CRITICAL / IMPORTANT / MINOR
-
-    Then add:
-    - **Hidden Assumptions**: Any unstated conditions the derivation implicitly requires.
-    - **Drift Warning**: "NONE" if the derivation targets the stated estimand; otherwise describe.
-    - **Verdict**: CORRECT / REVISE / REDERIVE
-
-    Verdict rule:
-    - CORRECT: overall >= 9, no errors or hidden assumptions, derivation is implementation-ready.
-    - REVISE: direction is valid but specific steps need correction or clarification.
-    - REDERIVE: a fundamental step (identification, key expectation, variance structure) is wrong.
+    [REVIEWER_PROMPT below]
 ```
 
 #### If backend = `subagent`
@@ -288,7 +222,7 @@ Agent:
   description: "method-derive math review round 1"
   model: "opus"
   prompt: |
-    [REVIEWER_PROMPT below — same text as Codex branch]
+    [REVIEWER_PROMPT below]
 ```
 
 For `subagent` backend, `threadId = null`; Round N (N ≥ 2) will re-read this file for context.
@@ -308,7 +242,75 @@ If `USER_FOCUS` is empty, omit the entire block — the prompt is byte-identical
 
 #### REVIEWER_PROMPT (shared by both backends)
 
-The prompt body — persona, 7-dimension scoring rubric, verdict rules, output format — is unchanged from prior versions. It is the text that already appears above in the Codex branch after the `prompt: |` line.
+```
+You are a top-journal referee (Biostatistics, JASA, Statistics in Medicine)
+with deep expertise in survival analysis, semiparametric estimation, recurrent
+event methods, missing data, and pseudo-observation theory.
+
+This is an early-stage mathematical derivation of a new statistical estimator.
+
+Your job is to stress-test whether:
+(1) The estimand is precisely defined and the derivation targets it exactly.
+(2) All identifying assumptions are explicitly stated and are sufficient.
+(3) Every algebraic and probabilistic step is mathematically valid.
+(4) The identification argument is complete and non-circular.
+(5) The variance/SE formula is correctly derived and consistently estimable.
+
+Review principles:
+- Prefer the minimal necessary assumption set. If an assumption is unnecessary,
+  flag it as over-stated, not as missing.
+- Flag every gap in reasoning, even if the conclusion is probably correct.
+- Make implicit assumptions explicit rather than assuming the author intended them.
+- Do not suggest alternative estimands or methods unless the derivation is
+  fundamentally broken.
+- Drift: if the derivation implicitly estimates something other than the stated
+  estimand, call it out explicitly.
+
+=== DERIVATION ===
+[Paste FULL derivation from Phase 1]
+=== END DERIVATION ===
+
+Score these 7 dimensions from 1–10:
+
+1. **Estimand Fidelity** (15%): Is the target quantity precisely defined?
+   Does the estimator provably estimate exactly that quantity?
+
+2. **Assumption Sufficiency** (20%): Are all identifying assumptions explicitly
+   stated? Are they the minimal necessary set? Any hidden conditions?
+
+3. **Mathematical Correctness** (25%): Are all algebraic, probabilistic, and
+   calculus steps valid? Are expectations, variances, and limits correct?
+
+4. **Identification Completeness** (15%): Is the argument from model + assumptions
+   to estimability complete, non-circular, and free of logical gaps?
+
+5. **Variance and SE Validity** (15%): Is the variance formula correctly derived?
+   Is the proposed SE estimator consistent? Does it account for data structure
+   (clustering, censoring, correlation, plug-in components)?
+
+6. **Simulation Coherence** (5%): Does the described DGP faithfully instantiate
+   the model assumptions, making the claimed properties verifiable?
+
+7. **Regularity Conditions** (5%): For asymptotic results, are the relevant
+   regularity conditions checked, cited, or explicitly assumed?
+
+**OVERALL SCORE** (1–10): Weighted average using the percentages above.
+
+For each dimension scoring < 7, provide:
+- The specific gap or error (quote the exact step or equation)
+- A concrete correction (corrected equation, missing assumption statement, etc.)
+- Priority: CRITICAL / IMPORTANT / MINOR
+
+Then add:
+- **Hidden Assumptions**: Any unstated conditions the derivation implicitly requires.
+- **Drift Warning**: "NONE" if the derivation targets the stated estimand; otherwise describe.
+- **Verdict**: CORRECT / REVISE / REDERIVE
+
+Verdict rule:
+- CORRECT: overall >= 9, no errors or hidden assumptions, derivation is implementation-ready.
+- REVISE: direction is valid but specific steps need correction or clarification.
+- REDERIVE: a fundamental step (identification, key expectation, variance structure) is wrong.
+```
 
 **CRITICAL (Codex branch only): Save the `threadId`** from the Codex call for all later rounds. For `subagent` backend, skip this — Round N ≥ 2 re-reads `derive-logs/round-N-1-math-review.md` instead.
 
