@@ -1,0 +1,18 @@
+{
+  "round": 1,
+  "threadId": null,
+  "reviewer_backend": "subagent",
+  "status": "completed",
+  "criteria_scores": {
+    "contract_match": "PASS",
+    "runtime_correctness": "PASS",
+    "bug_resistance": "PASS",
+    "coherence": "PASS",
+    "self_containedness": "PASS",
+    "verification_coverage": "PASS",
+    "failure_handling": "PASS",
+    "scope_discipline": "PASS"
+  },
+  "open_blockers": [],
+  "timestamp": "2026-04-19T00:00:00"
+}
