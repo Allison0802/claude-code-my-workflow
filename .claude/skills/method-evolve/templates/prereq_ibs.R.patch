@@ -1,0 +1,10 @@
+# ibs-patch-version: 1  (method-evolve prereq)
+# -----------------------------------------------------------------------------
+# Inserted by /method-evolve prereq. Do not edit by hand; re-run prereq if the
+# version stamp above is out of date.
+# -----------------------------------------------------------------------------
+source(here::here("Missing Types", "scripts", "R", "pseudo_brier.R"))
+
+# Expectation: per-seed result assembly appends an `ibs` column.
+# If the downstream script's result-assembly block already matches, this
+# patch is a no-op except for the version-stamp line above.
