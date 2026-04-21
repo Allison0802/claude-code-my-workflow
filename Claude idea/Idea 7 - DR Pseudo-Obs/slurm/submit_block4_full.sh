@@ -32,6 +32,7 @@ echo "Block 4 Full -- Cross-fit RF"
 echo "=============================="
 
 # Load R
+module load gdal 2>/dev/null
 module load r/4.4.0
 echo "R version: $(R --version | head -1)"
 

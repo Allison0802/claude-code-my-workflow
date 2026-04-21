@@ -57,6 +57,7 @@ for N_VAL in "${N_VALUES[@]}"; do
 # ---- Environment ----
 module load gcc 2>/dev/null
 export LD_LIBRARY_PATH="/nas/longleaf/rhel8/apps/r/4.4.0/lib64/R/lib:\$LD_LIBRARY_PATH"
+module load gdal 2>/dev/null
 module load r/4.4.0
 
 # ---- Identify estimator from array task ID ----
