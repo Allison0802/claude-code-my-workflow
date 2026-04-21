@@ -3,39 +3,16 @@
 **Project:** ML Methods for Recurrent Events with Multiple Types
 **Institution:** UNC Chapel Hill
 **Branch:** main
-
+**NotebookLM:** [ML for Recurrent Events](https://notebooklm.google.com/notebook/0bf80af5-8b8d-423d-b7ef-94b13ad48f7b) | [Interpretable AI](https://notebooklm.google.com/notebook/fea2207b-7ec1-463c-b73f-58c0c4febb41)
+[Machine Learning Fundamentals](https://notebooklm.google.com/notebook/c3aab8e1-5c4b-43ec-bafc-ae3745a7c493)
+[Survival Analysis Fundamentals](https://notebooklm.google.com/notebook/3faa5656-280d-4ffc-ae2d-5487075bc94e)
 ---
 
 ## Tech Stack
 
-| Tool | Version / Detail |
-|------|-----------------|
-| R | 4.4.0 (Longleaf HPC) |
-| LaTeX | XeLaTeX (3-pass + bibtex) |
-| Cluster | SLURM (UNC Longleaf) |
-| Key R packages | `survival`, `cmprsk`, `randomForest`, `ranger`, `partykit`, `LongituRF`, `SAEforest`, `glmnet`, `nnet`, `tidyverse`, `here` |
+R 4.4.0 (Longleaf HPC) | XeLaTeX (3-pass + bibtex) | SLURM (UNC Longleaf)
 
----
-
-## Setup & Installation
-
-```bash
-# R packages (install once)
-install.packages(c(
-  "tidyverse", "survival", "cmprsk", "Hmisc",
-  "randomForest", "ranger", "partykit", "LongituRF", "SAEforest",
-  "glmnet", "nnet", "parallel", "here",
-  "gridExtra", "patchwork"
-))
-
-# LaTeX: requires XeLaTeX distribution (e.g., TeX Live or MacTeX)
-# Verify: xelatex --version
-
-# Clone sub-projects (separate repos)
-cd Research/
-git clone <comparisons-repo-url> comparisons/
-git clone <missing-types-repo-url> "Missing Types/"
-```
+Key R packages: `survival`, `cmprsk`, `randomForest`, `ranger`, `partykit`, `LongituRF`, `SAEforest`, `glmnet`, `nnet`, `tidyverse`, `here`
 
 ---
 
@@ -44,188 +21,61 @@ git clone <missing-types-repo-url> "Missing Types/"
 - **Plan first** -- enter plan mode before non-trivial tasks; save plans to `quality_reports/plans/`
 - **Verify after** -- compile/render and confirm output at the end of every task
 - **Reproducibility** -- `set.seed(YYYYMMDD)`, `here::here()` paths, all results replicable
-- **Quality gates** -- nothing ships below 80/100
-- **[LEARN] tags** -- when corrected, save `[LEARN:category] wrong → right` to MEMORY.md
-- **Change logging** -- after any major change in **any folder** (parent or subprojects `comparisons/`, `Missing Types/`): (1) update the `Last Updated` metadata header in the modified script, and (2) append a one-line entry to `quality_reports/session_logs/` describing what changed and why
+- **Quality gates** -- nothing ships below 80/100 (commit), 90/100 (PR), 95/100 (excellence)
+- **[LEARN] tags** -- when corrected, save `[LEARN:category] wrong -> right` to MEMORY.md
+- **Change logging** -- see `## Change Logging` section below and `.claude/rules/session-logging.md`
+- **Skill outputs preserved** -- proposals, summaries, reports, plans, and other documents produced by skills go into dedicated dated subfolders; never overwrite previous runs
+- **Test locally first** -- before writing or editing any script intended for Longleaf, run a small-scale local test (reduced N, fewer iterations) to verify logic and catch errors cheaply
 
 ---
 
-## Folder Structure
+## Key Paths
 
-```
-Research/
-├── CLAUDE.md                    # This file
-├── .claude/                     # Rules, skills, agents, hooks
-│   ├── rules/                   # r-code-conventions.md, knowledge-base-template.md, etc.
-│   ├── agents/                  # domain-reviewer.md, etc.
-│   └── WORKFLOW_QUICK_REF.md   # Skill/command quick reference
-├── Bibliography_base.bib        # Centralized bibliography (shared across sub-projects)
-├── Figures/                     # Shared figures and images
-├── Papers/                      # LaTeX manuscript chapters
-├── Preambles/header.tex         # LaTeX headers
-├── Quarto/                      # Quarto documents
-├── Slides/                      # Presentation slides
-├── scripts/                     # Utility scripts
-│   └── R/                       # Shared R code (helpers, themes, palettes)
-├── docs/                        # Documentation
-├── guide/                       # Project guide materials
-├── quality_reports/             # Plans, session logs, merge reports
-├── explorations/                # Research sandbox (see rules)
-├── templates/                   # Session log, quality report templates
-├── master_supporting_docs/      # Reference papers
-├── comparisons/                 # Sub-project: method comparisons (separate repo)
-└── Missing Types/               # Sub-project: missing event types (separate repo)
-```
+| Path | Purpose |
+|------|---------|
+| `.claude/rules/` | R conventions, knowledge base, session logging rules |
+| `.claude/agents/` | domain-reviewer, r-reviewer, verifier, proofreader |
+| `.claude/WORKFLOW_QUICK_REF.md` | Skill/command quick reference |
+| `Bibliography_base.bib` | Centralized bibliography (shared across sub-projects) |
+| `Papers/` | LaTeX manuscript chapters |
+| `Preambles/header.tex` | LaTeX headers |
+| `scripts/R/` | Shared R code (helpers, themes, palettes) |
+| `quality_reports/` | Plans, session logs, merge reports |
+| `explorations/` | Research sandbox (60/100 threshold) |
+| `comparisons/` | Sub-project: method comparisons (separate repo) |
+| `Missing Types/` | Sub-project: missing event types (separate repo) |
 
 ---
 
 ## Commands
 
 ```bash
-# LaTeX manuscript (3-pass, XeLaTeX)
+# LaTeX manuscript (3-pass)
 cd Papers && TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode file.tex
 BIBINPUTS=..:$BIBINPUTS bibtex file
-TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode file.tex
-TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode file.tex
+TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode file.tex  # run twice more
 
-# Run R simulation
+# R simulation
 Rscript scripts/R/filename.R
-
-# Quality score
-python scripts/quality_score.py file
 ```
-
----
-
-## Quality Thresholds
-
-| Score | Gate | Meaning |
-|-------|------|---------|
-| 80 | Commit | Good enough to save |
-| 90 | PR | Ready for deployment |
-| 95 | Excellence | Aspirational |
-
----
-
-## Skills & Agents Quick Reference
-
-### Writing & Manuscript
-
-| Command | What It Does |
-|---------|-------------|
-| `/compile-latex [file]` | 3-pass XeLaTeX + bibtex (manual) |
-| `/paper-compile [file]` | Compile LaTeX, auto-fix errors, verify output |
-| `/proofread [file]` | Grammar/typo review |
-| `/review-paper [file]` | Deep manuscript review |
-| `/validate-bib` | Cross-reference citations |
-| `/paper-plan [outline]` | Structured paper outline from review + results |
-| `/paper-write [section]` | Draft LaTeX section by section |
-| `/paper-figure [results]` | Publication-quality figures from experiment data |
-| `/paper-writing [outline]` | Full pipeline: plan → figures → write → compile |
-| `/auto-paper-improvement-loop [file]` | Autonomous GPT review → fix → recompile loop |
-
-### R Code & Analysis
-
-| Command | What It Does |
-|---------|-------------|
-| `/review-r [file]` | R code quality, reproducibility, figure compliance |
-| `/data-analysis [dataset]` | End-to-end R analysis workflow |
-| `/analyze-results [path]` | Analyze experiment results, build comparison tables |
-| `/visual-audit [file]` | Figure layout audit (overflow, fonts, spacing) |
-
-### SLURM / Simulation
-
-| Command | What It Does |
-|---------|-------------|
-| `/run-experiment [script]` | Deploy and run R simulations on Longleaf SLURM |
-| `/monitor-experiment [job]` | Check SLURM progress, collect results, flag failures |
-
-### Literature & Ideas
-
-| Command | What It Does |
-|---------|-------------|
-| `/lit-review [topic]` | Literature search + synthesis |
-| `/research-lit [topic]` | Search papers, find related work, summarize key ideas |
-| `/arxiv [query]` | Search, download, summarize arXiv papers |
-| `/novelty-check [idea]` | Verify novelty against recent literature |
-| `/idea-creator [topic]` | Generate and rank research ideas |
-| `/idea-discovery [topic]` | Full pipeline: lit → ideas → novelty check |
-| `/research-ideation [topic]` | Research questions + strategies |
-| `/interview-me [topic]` | Interactive research interview |
-
-### Review & QA
-
-| Command | What It Does |
-|---------|-------------|
-| `/research-review [file]` | Deep critical review via GPT/Codex |
-| `/auto-review-loop [file]` | Autonomous multi-round review → fix loop |
-| `/auto-review-loop-llm [file]` | Same, using any OpenAI-compatible LLM API |
-| `/devils-advocate [claim]` | Adversarial review of methods or arguments |
-| `/proof-writer [theorem]` | Write rigorous mathematical proofs |
-| `/research-pipeline [topic]` | Full pipeline: idea discovery → implementation → review |
-
-### Git
-
-| Command | What It Does |
-|---------|-------------|
-| `/commit [msg]` | Stage, commit, PR, merge with quality check |
-
----
-
-## Agents Quick Reference
-
-Agents run autonomously via the Agent tool. Invoke proactively after completing work.
-
-| Agent | When to Use |
-|-------|------------|
-| `domain-reviewer` | After drafting methods, simulations, or results — checks statistical correctness through 5 lenses (survival analysis + ML expertise) |
-| `r-reviewer` | After writing or modifying any R script — checks code quality, reproducibility, figure standards |
-| `verifier` | Before committing or creating PRs — checks compile, render, deploy |
-| `proofreader` | After creating or modifying manuscript content — grammar, typos, overflow |
-
----
-
-## Scientific Skills (claude-scientific-skills bundle)
-
-Available at `.claude/skills/claude-scientific-skills/scientific-skills/`. Reference for methodology and Python cross-checking:
-
-| Skill | Relevance |
-|-------|----------|
-| `scikit-survival` | Survival analysis reference: Cox, RSF, concordance index, competing risks |
-| `statistical-analysis` | Test selection, assumption checks, APA-formatted results |
-| `exploratory-data-analysis` | EDA guidance for simulation output |
-| `pymc` | Bayesian frailty modeling (hierarchical extension research) |
-| `pubmed-database` | Medical literature search for clinical context |
-| `openalex-database` | Academic paper search across all fields |
-| `literature-review` | Structured lit review workflow |
-| `hypothesis-generation` | Research hypothesis development |
-| `peer-review` | Manuscript peer review guidance |
-| `scientific-writing` | Academic writing style and structure |
-
-**Dormant** (slide/teaching focused — archived to `.claude/skills/_DORMANT/`, reactivate for defense or job talk):
-`translate-to-quarto`, `create-lecture`, `slide-excellence`, `qa-quarto`, `pedagogy-review`, `extract-tikz`, `deploy`, `visual-audit`, `devils-advocate`
 
 ---
 
 ## Sub-Project Hybrid Model
 
-This repo is the **parent hub** for two sub-projects that are separate git repos:
+Parent repo is shared config hub for two sub-projects (separate git repos):
 
 | Sub-Project | Path | Focus |
 |-------------|------|-------|
-| Comparisons | `comparisons/` | Method comparison simulations |
-| Missing Types | `Missing Types/` | Handling missing event types |
+| Comparisons | `comparisons/` | ML method comparisons for recurrent events (37 scenarios) |
+| Missing Types | `Missing Types/` | Pseudo-observations with missing event types (5 imputation methods) |
 
-**Shared resources from parent:**
-- `Bibliography_base.bib` -- centralized bibliography
-- `scripts/R/` -- shared R helpers, color palette, ggplot theme
-- `.claude/rules/` -- shared conventions (R code, knowledge base)
-- `Figures/` -- shared figures referenced across papers
+**Shared from parent:** `Bibliography_base.bib`, `scripts/R/`, `.claude/rules/`, `Figures/`
 
-**Conventions across all sub-projects:**
-- Colorblind-friendly Okabe-Ito palette (see `.claude/rules/r-code-conventions.md`)
-- `here::here()` for all file paths in R
-- `set.seed(YYYYMMDD)` at top of every stochastic script
+**Conventions across all:**
+- Okabe-Ito colorblind-friendly palette (see `.claude/rules/r-code-conventions.md`)
+- `here::here()` for all R paths
+- `set.seed(YYYYMMDD)` at top of stochastic scripts
 - Publication-ready figures: 300 DPI, white background, `.pdf` or `.png`
 
 ---
@@ -233,43 +83,75 @@ This repo is the **parent hub** for two sub-projects that are separate git repos
 ## Architecture
 
 ```
-Data Generation → Landmark Transformation → Pseudo-observations → Model Fitting → Evaluation
+Data Generation -> Landmark Transformation -> Pseudo-observations -> Model Fitting -> Evaluation
 ```
 
-- **Comparisons project**: Generates recurrent competing risks data under 37 scenarios (frailty × complexity × correlation × censoring), fits Cox/RF/MERF models, evaluates via time-specific C-index
-- **Missing Types project**: Introduces MCAR/MAR missingness (10-50%) into event types, applies 5 imputation methods (CCA, IPW, IPW-RF, RPM, DR), evaluates recovery of predictive performance
-- Both projects share `functions.R` for data generation (`rate_cox_data_gen_complex()`), landmark transformation, and pseudo-observation computation
+- **Comparisons**: Recurrent competing risks data (frailty x complexity x correlation x censoring), Cox/RF/MERF models, time-specific C-index
+- **Missing Types**: MCAR/MAR missingness (10-50%), 5 imputation methods (CCA, IPW, IPW-RF, RPM, DR), recovery of predictive performance
+- Shared `functions.R`: `rate_cox_data_gen_complex()`, landmark transformation, pseudo-observation computation
+
+---
+
+## Agents (invoke proactively after completing work)
+
+- **`domain-reviewer`** -- after drafting methods/simulations/results (5 lenses: survival + ML)
+- **`r-reviewer`** -- after writing/modifying R scripts (quality, reproducibility, figures)
+- **`verifier`** -- before committing or creating PRs (compile, render, deploy)
+- **`proofreader`** -- after modifying manuscript content (grammar, typos, overflow)
 
 ---
 
 ## Change Logging
 
-**This rule applies to the parent folder and both subprojects (`comparisons/`, `Missing Types/`).**
+Applies to parent and both subprojects. See `.claude/rules/session-logging.md` for full protocol.
 
-After any major change (new feature, bug fix, refactored function, new scenario, updated analysis), Claude MUST:
+**After any major change**, Claude MUST:
+1. Update `Last Updated: YYYY-MM-DD` in the modified file's header
+2. Append to `quality_reports/session_logs/YYYY-MM-DD_description.md`:
+   `- [HH:MM] <file> -- <what changed and why>`
 
-1. **Update script header** -- set `Last Updated: YYYY-MM-DD` in the modified file's metadata block.
-2. **Append a session log entry** -- add one line to `quality_reports/session_logs/YYYY-MM-DD_description.md`:
-   ```
-   - [HH:MM] <file or folder> — <what changed and why>
-   ```
-   Create the file if it does not exist for today's date.
+**Do not log:** whitespace fixes, comment-only edits, auto-generated output files.
 
-**Triggers (log any of these):**
-- R script added, edited, or deleted
-- Simulation scenario added or removed
-- Analysis pipeline changed
-- LaTeX manuscript section edited
-- Figure generation updated
-- Functions in `functions.R` modified
+---
 
-**Do not log:** trivial whitespace fixes, comment-only edits, or auto-generated output files.
+## Skills & Workflow
+
+Skills are auto-discovered from `.claude/skills/`. See `.claude/WORKFLOW_QUICK_REF.md` for the full command reference.
+
+Key entry points: `/review` (auto-routes by file type), `/commit`, `/paper-compile`, `/run-experiment`, `/arxiv`, `/research-pipeline`
+
+Scientific skills at `.claude/skills/claude-scientific-skills/scientific-skills/` (scikit-survival, statistical-analysis, pymc, etc.)
+
+Dormant slide skills archived to `.claude/skills/_DORMANT/` -- reactivate for defense or job talk.
+
+---
+
+## Skill Output Storage
+
+All documents produced by skills (proposals, summaries, reports, refinement logs, review transcripts, plans, etc.) **must be saved to their own named and dated subfolder** under a dedicated directory. **Never overwrite or append to existing outputs from previous runs.**
+
+**Pattern:** `<subproject>/quality_reports/<skill-category>/YYYY-MM-DD_<short-description>/`
+
+**Examples:**
+
+```text
+Missing Types/quality_reports/refine-logs/2026-04-12_pseudo-obs-refinement/
+comparisons/quality_reports/review-transcripts/2026-04-12_cox-vs-rf-review/
+quality_reports/paper-improvement/2026-04-12_biostat-round3/
+```
+
+**Rules:**
+
+- Each skill run creates a **new dated subfolder** -- never reuse or overwrite a previous one
+- If the same skill runs twice on the same day, append a sequence number: `2026-04-12_topic-02/`
+- Place outputs in the **sub-project** they belong to (`comparisons/`, `Missing Types/`), or in the parent `quality_reports/` for cross-project work
+- Skill-specific folder names (e.g., `refine-logs/`, `review-transcripts/`, `paper-improvement/`, `novelty-checks/`) should reflect the skill category
 
 ---
 
 ## Current Project State
 
-| Project | Location | Status | Key Content |
-|---------|----------|--------|-------------|
-| Comparisons | `comparisons/` | Active | ML method comparisons for recurrent events |
-| Missing Types | `Missing Types/` | Active | Pseudo-observations with missing event types |
+| Project | Status |
+|---------|--------|
+| Comparisons (`comparisons/`) | Active -- ML method comparisons |
+| Missing Types (`Missing Types/`) | Active -- pseudo-obs with missing event types |
