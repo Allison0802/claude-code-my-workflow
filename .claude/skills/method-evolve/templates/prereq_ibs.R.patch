@@ -3,7 +3,7 @@
 # Inserted by /method-evolve prereq. Do not edit by hand; re-run prereq if the
 # version stamp above is out of date.
 # -----------------------------------------------------------------------------
-source(here::here("Missing Types", "scripts", "R", "pseudo_brier.R"))
+source(here::here("scripts", "R", "pseudo_brier.R"))  # path is relative to submodule root
 
 # Expectation: per-seed result assembly appends an `ibs` column.
 # If the downstream script's result-assembly block already matches, this
