@@ -39,6 +39,10 @@ Thumbs.db
 # Claude Code local files (not shared across machines)
 .claude/settings.local.json
 .claude/state/
+.claude/projects/
+
+# Nested / duplicate clones (tracked as submodule elsewhere)
+/Auto-claude-code-research-in-sleep/
 
 # IDE
 .vscode/
