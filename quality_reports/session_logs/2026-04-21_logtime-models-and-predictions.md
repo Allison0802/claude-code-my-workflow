@@ -96,7 +96,17 @@ affected, but local smoke tests and any OneDrive-synced checkout were.
   — 7× `export SAVE_PREDICTIONS="${SAVE_PREDICTIONS:-true}"` after
   `SAVE_INTERVAL` line
 
-## Open question for user
+## Cluster launch
 
-Ready to launch cluster? Confirm and I'll run
-`sbatch submit_missing_types_<method>.sh` for all 7 methods.
+- [~14:35] User uploaded scripts to Longleaf and submitted all 7 methods
+  manually via `sbatch submit_missing_types_<method>.sh`. Task 14 complete.
+- Wall-time budget per method: `--time=240:00:00`, 8-job array, 64 CPUs,
+  200 GB RAM. Expect full completion in roughly 4–5 days worst-case.
+
+## Next (when jobs finish)
+
+1. `analyze_missing_types_results.R` → aggregate cindex tables + figures.
+2. Identify median seed per (scenario × method) from the new predictions
+   dataframes.
+3. Targeted re-run with `SAVE_FULL_MODELS=true SEED=<median>` to pickle
+   fitted model objects for PDP/ALE/SHAP interpretability work.
