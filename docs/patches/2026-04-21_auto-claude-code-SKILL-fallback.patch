@@ -1,0 +1,270 @@
+diff --git a/skills/auto-paper-improvement-loop/SKILL.md b/skills/auto-paper-improvement-loop/SKILL.md
+index 6328ac3..7b6562f 100644
+--- a/skills/auto-paper-improvement-loop/SKILL.md
++++ b/skills/auto-paper-improvement-loop/SKILL.md
+@@ -1,6 +1,6 @@
+ ---
+ name: auto-paper-improvement-loop
+-description: "Autonomously improve a generated paper via GPT-5.4 xhigh review → implement fixes → recompile, for 2 rounds. Use when user says \"改论文\", \"improve paper\", \"论文润色循环\", \"auto improve\", or wants to iteratively polish a generated paper."
++description: "Autonomously improve a generated paper via external review → implement fixes → recompile, for 2 rounds. Uses GPT-5.4 via Codex MCP when available; falls back to Claude subagent reviewer when Codex is unavailable. Use when user says \"改论文\", \"improve paper\", \"论文润色循环\", \"auto improve\", or wants to iteratively polish a generated paper."
+ argument-hint: [paper-directory]
+ allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, mcp__codex__codex, mcp__codex__codex-reply
+ ---
+@@ -18,11 +18,13 @@ Unlike `/auto-review-loop` (which iterates on **research** — running experimen
+ ## Constants
+ 
+ - **MAX_ROUNDS = 2** — Two rounds of review→fix→recompile. Empirically, Round 1 catches structural issues (4→6/10), Round 2 catches remaining presentation issues (6→7/10). Diminishing returns beyond 2 rounds for writing-only improvements.
+-- **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for paper review.
++- **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for paper review (primary path).
+ - **REVIEW_LOG = `PAPER_IMPROVEMENT_LOG.md`** — Cumulative log of all rounds, stored in paper directory.
+ - **HUMAN_CHECKPOINT = false** — When `true`, pause after each round's review and present score + weaknesses to the user. The user can approve fixes, provide custom modification instructions, skip specific fixes, or stop early. When `false` (default), runs fully autonomously.
++- **REVIEWER_MODE = auto** — `codex` (force Codex MCP), `subagent` (force subagent), or `auto` (detect at runtime). See Step 0b.
+ 
+ > 💡 Override: `/auto-paper-improvement-loop "paper/" — human checkpoint: true`
++> 💡 Override: `/auto-paper-improvement-loop "paper/" — reviewer: subagent`
+ 
+ ## Inputs
+ 
+@@ -36,6 +38,7 @@ If the context window fills up mid-loop, Claude Code auto-compacts. To recover,
+ ```json
+ {
+   "current_round": 1,
++  "reviewer_backend": "codex",
+   "threadId": "019ce736-...",
+   "last_score": 6,
+   "status": "in_progress",
+@@ -43,6 +46,8 @@ If the context window fills up mid-loop, Claude Code auto-compacts. To recover,
+ }
+ ```
+ 
++> `threadId` is only present when `reviewer_backend` is `"codex"`. For `"subagent"`, this field is omitted (stateless).
++
+ **On startup**: if `PAPER_IMPROVEMENT_STATE.json` exists with `"status": "in_progress"` AND `timestamp` is within 24 hours, read it + `PAPER_IMPROVEMENT_LOG.md` to recover context, then resume from the next round. Otherwise (file absent, `"status": "completed"`, or older than 24 hours), start fresh.
+ 
+ **After each round**: overwrite the state file. **On completion**: set `"status": "completed"`.
+@@ -55,6 +60,25 @@ If the context window fills up mid-loop, Claude Code auto-compacts. To recover,
+ cp paper/main.pdf paper/main_round0_original.pdf
+ ```
+ 
++### Step 0b: Detect Reviewer Mode
++
++Determine which reviewer backend to use. If `REVIEWER_MODE` is explicitly set to `codex` or `subagent`, use that. Otherwise (`auto`), detect at runtime:
++
++```
++1. Try calling mcp__codex__codex with a no-op ping (e.g., prompt: "Reply OK")
++2. If the tool exists and responds → REVIEWER_BACKEND = "codex"
++3. If the tool errors, times out, or is not found → REVIEWER_BACKEND = "subagent"
++```
++
++Log the chosen backend in `PAPER_IMPROVEMENT_LOG.md`:
++```
++Reviewer backend: codex (GPT-5.4 via Codex MCP)
++— or —
++Reviewer backend: subagent (Claude domain-reviewer agent)
++```
++
++> ⚠️ The subagent reviewer uses a fresh Claude agent with the `architect-reviewer` type and a detailed paper-review system prompt. It produces the same structured output format (score, strengths, weaknesses, fixes, verdict) so all downstream steps work identically regardless of backend.
++
+ ### Step 1: Collect Paper Text
+ 
+ Concatenate all section files into a single text block for the review prompt:
+@@ -69,33 +93,70 @@ done > /tmp/paper_full_text.txt
+ 
+ ### Step 2: Round 1 Review
+ 
+-Send the full paper text to GPT-5.4 xhigh:
++Send the full paper text to the reviewer. The review prompt is identical regardless of backend:
++
++**REVIEW_PROMPT (shared across both backends):**
++
++```
++You are reviewing a [VENUE] paper. Please provide a detailed, structured review.
++
++## Full Paper Text:
++[paste concatenated sections]
++
++## Review Instructions
++Please act as a senior ML reviewer ([VENUE] level). Provide:
++1. **Overall Score** (1-10, where 6 = weak accept, 7 = accept)
++2. **Summary** (2-3 sentences)
++3. **Strengths** (bullet list, ranked)
++4. **Weaknesses** (bullet list, ranked: CRITICAL > MAJOR > MINOR)
++5. **For each CRITICAL/MAJOR weakness**: A specific, actionable fix
++6. **Missing References** (if any)
++7. **Verdict**: Ready for submission? Yes / Almost / No
++
++Focus on: theoretical rigor, claims vs evidence alignment, writing clarity,
++self-containedness, notation consistency.
++```
++
++---
++
++**Path A — Codex MCP (REVIEWER_BACKEND = "codex"):**
+ 
+ ```
+ mcp__codex__codex:
+   model: gpt-5.4
+   config: {"model_reasoning_effort": "xhigh"}
+-  prompt: |
+-    You are reviewing a [VENUE] paper. Please provide a detailed, structured review.
++  prompt: [REVIEW_PROMPT]
++```
+ 
+-    ## Full Paper Text:
+-    [paste concatenated sections]
++Save the `threadId` for Round 2 (enables conversation continuity).
+ 
+-    ## Review Instructions
+-    Please act as a senior ML reviewer ([VENUE] level). Provide:
+-    1. **Overall Score** (1-10, where 6 = weak accept, 7 = accept)
+-    2. **Summary** (2-3 sentences)
+-    3. **Strengths** (bullet list, ranked)
+-    4. **Weaknesses** (bullet list, ranked: CRITICAL > MAJOR > MINOR)
+-    5. **For each CRITICAL/MAJOR weakness**: A specific, actionable fix
+-    6. **Missing References** (if any)
+-    7. **Verdict**: Ready for submission? Yes / Almost / No
++---
++
++**Path B — Subagent Reviewer (REVIEWER_BACKEND = "subagent"):**
++
++Spawn a Claude subagent with the `architect-reviewer` type. The subagent receives the full paper text and review instructions, and returns the same structured output.
+ 
+-    Focus on: theoretical rigor, claims vs evidence alignment, writing clarity,
+-    self-containedness, notation consistency.
++```
++Agent:
++  description: "Paper review round 1"
++  subagent_type: architect-reviewer
++  prompt: |
++    You are an independent reviewer for an academic paper submitted to [VENUE].
++    Your task is to provide a rigorous, structured review — as if you were a
++    senior ML reviewer for a top-tier conference (NeurIPS/ICML/ICLR level).
++
++    [REVIEW_PROMPT]
++
++    IMPORTANT:
++    - Be brutally honest about weaknesses. Rank them CRITICAL > MAJOR > MINOR.
++    - For each CRITICAL or MAJOR weakness, provide a specific, actionable fix
++      (not vague advice like "improve writing" — say exactly what to change).
++    - Do not fabricate praise. If a section is weak, say so.
++    - Your response must follow the exact numbered format above (Score, Summary,
++      Strengths, Weaknesses, Fixes, Missing References, Verdict).
+ ```
+ 
+-Save the threadId for Round 2.
++> **Note:** Subagent reviews are stateless — there is no thread continuity between rounds. Round 2 must include a summary of Round 1 feedback and changes in the prompt (see Step 5 Path B).
+ 
+ ### Step 2b: Human Checkpoint (if enabled)
+ 
+@@ -149,7 +210,23 @@ Verify: 0 undefined references, 0 undefined citations.
+ 
+ ### Step 5: Round 2 Review
+ 
+-Use `mcp__codex__codex-reply` with the saved threadId:
++**ROUND_2_UPDATE (shared context for both backends):**
++
++```
++Since the last review, we have implemented:
++1. [Fix 1]: [description]
++2. [Fix 2]: [description]
++...
++
++Please re-score and re-assess. Same format:
++Score, Summary, Strengths, Weaknesses, Actionable fixes, Verdict.
++```
++
++---
++
++**Path A — Codex MCP (REVIEWER_BACKEND = "codex"):**
++
++Use `mcp__codex__codex-reply` with the saved threadId for conversation continuity:
+ 
+ ```
+ mcp__codex__codex-reply:
+@@ -158,14 +235,50 @@ mcp__codex__codex-reply:
+   config: {"model_reasoning_effort": "xhigh"}
+   prompt: |
+     [Round 2 update]
++    [ROUND_2_UPDATE]
++```
++
++---
++
++**Path B — Subagent Reviewer (REVIEWER_BACKEND = "subagent"):**
++
++Since subagents are stateless, provide full context: the original paper text, the Round 1 review summary, the fixes implemented, and the updated paper text.
+ 
+-    Since your last review, we have implemented:
+-    1. [Fix 1]: [description]
+-    2. [Fix 2]: [description]
+-    ...
++```
++Agent:
++  description: "Paper review round 2"
++  subagent_type: architect-reviewer
++  prompt: |
++    You are an independent reviewer for an academic paper submitted to [VENUE].
++    This is your SECOND review of this paper. You previously reviewed an earlier
++    draft and provided the feedback summarized below. The authors have revised
++    the paper in response. Your job is to re-assess.
++
++    ## Round 1 Review Summary
++    - Score: [X]/10
++    - Key weaknesses identified:
++      1. [CRITICAL/MAJOR weakness 1]
++      2. [CRITICAL/MAJOR weakness 2]
++      ...
++
++    ## Changes Made Since Round 1
++    [ROUND_2_UPDATE]
++
++    ## Updated Full Paper Text
++    [paste updated concatenated sections]
++
++    ## Review Instructions
++    Please act as a senior ML reviewer ([VENUE] level). Provide:
++    1. **Overall Score** (1-10, where 6 = weak accept, 7 = accept)
++    2. **Summary** (2-3 sentences)
++    3. **Strengths** (bullet list, ranked)
++    4. **Weaknesses** (bullet list, ranked: CRITICAL > MAJOR > MINOR)
++    5. **For each CRITICAL/MAJOR weakness**: A specific, actionable fix
++    6. **Missing References** (if any)
++    7. **Verdict**: Ready for submission? Yes / Almost / No
+ 
+-    Please re-score and re-assess. Same format:
+-    Score, Summary, Strengths, Weaknesses, Actionable fixes, Verdict.
++    Focus especially on whether the Round 1 weaknesses were adequately addressed.
++    Be honest: if a fix is superficial or incomplete, call it out.
+ ```
+ 
+ ### Step 5b: Human Checkpoint (if enabled)
+@@ -239,7 +352,7 @@ Create `PAPER_IMPROVEMENT_LOG.md` in the paper directory:
+ ## Round 1 Review & Fixes
+ 
+ <details>
+-<summary>GPT-5.4 xhigh Review (Round 1)</summary>
++<summary>Review (Round 1)</summary>
+ 
+ [Full raw review text, verbatim]
+ 
+@@ -253,7 +366,7 @@ Create `PAPER_IMPROVEMENT_LOG.md` in the paper directory:
+ ## Round 2 Review & Fixes
+ 
+ <details>
+-<summary>GPT-5.4 xhigh Review (Round 2)</summary>
++<summary>Review (Round 2)</summary>
+ 
+ [Full raw review text, verbatim]
+ 
+@@ -301,8 +414,9 @@ paper/
+ - **Large file handling**: If the Write tool fails due to file size, immediately retry using Bash (`cat << 'EOF' > file`) to write in chunks. Do NOT ask the user for permission — just do it silently.
+ 
+ - **Preserve all PDF versions** — user needs to compare progression
+-- **Save FULL raw review text** — do not summarize or truncate GPT-5.4 responses
+-- **Use `mcp__codex__codex-reply`** for Round 2 to maintain conversation context
++- **Save FULL raw review text** — do not summarize or truncate reviewer responses (GPT-5.4 or subagent)
++- **Use `mcp__codex__codex-reply`** for Round 2 when using Codex backend (maintains conversation context). When using subagent backend, include full context (Round 1 review + changes + updated text) in the Round 2 prompt instead.
++- **Subagent reviews are independent** — each subagent invocation is stateless. Compensate by providing richer context in Round 2 prompts.
+ - **Always recompile after fixes** — verify 0 errors before proceeding
+ - **Do not fabricate experimental results** — synthetic validation must describe methodology, not invent numbers
+ - **Respect the paper's claims** — soften overclaims rather than adding unsupported new claims
