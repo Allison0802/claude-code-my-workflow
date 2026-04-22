@@ -60,3 +60,52 @@ test_that("check_column_presence fails on NA in required column", {
   expect_false(res$pass)
   expect_match(res$reason, "NA")
 })
+
+test_that("check_column_presence fails on non-numeric column", {
+  tdir <- tempfile(); dir.create(tdir)
+  script_path <- file.path(tdir, "dummy.R")
+  out_path    <- file.path(tdir, "out.rds")
+  # Write a script that saves a character column
+  writeLines(c(
+    sprintf("df <- data.frame(metric = c('a','b'), stringsAsFactors = FALSE)"),
+    sprintf("saveRDS(df, '%s')", out_path)
+  ), script_path)
+
+  cfg <- list(
+    target_script = script_path,
+    evaluator = list(env_vars = list(),
+                     results_file_pattern = out_path)
+  )
+  prereq <- list(id = "cols", type = "column-presence",
+                 smoke_env_vars = list(),
+                 required_columns = c("metric"))
+  res <- check_column_presence(prereq, cfg)
+  expect_false(res$pass)
+  expect_match(res$reason, "not numeric")
+})
+
+test_that("check_column_presence honors smoke_env_vars override over base env_vars", {
+  tdir <- tempfile(); dir.create(tdir)
+  out_path <- file.path(tdir, "out.rds")
+  script_path <- file.path(tdir, "dummy.R")
+  # Script reads N_SIMS and writes n_sims as a column so we can verify the override
+  writeLines(c(
+    "n_sims <- as.integer(Sys.getenv('N_SIMS'))",
+    sprintf("df <- data.frame(metric = 1, n_sims_seen = n_sims)"),
+    sprintf("saveRDS(df, '%s')", out_path)
+  ), script_path)
+
+  cfg <- list(
+    target_script = script_path,
+    evaluator = list(env_vars = list(N_SIMS = 9999L),
+                     results_file_pattern = out_path)
+  )
+  # smoke override should win
+  prereq <- list(id = "cols", type = "column-presence",
+                 smoke_env_vars = list(N_SIMS = 2L),
+                 required_columns = c("metric", "n_sims_seen"))
+  res <- check_column_presence(prereq, cfg)
+  expect_true(res$pass)
+  df <- readRDS(out_path)
+  expect_equal(df$n_sims_seen[1], 2L)  # smoke won, not 9999
+})

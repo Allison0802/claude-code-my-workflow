@@ -81,16 +81,25 @@ check_sidecar_meta <- function(prereq, cfg) {
 #'   cfg$evaluator$results_file_pattern.
 #' @return list(pass, reason).
 check_column_presence <- function(prereq, cfg) {
-  env_kvs <- c(prereq$smoke_env_vars, cfg$evaluator$env_vars)
+  # Base config env vars first, smoke overrides last — later duplicates win
+  # on Unix under system2(..., env = ...).
+  env_kvs <- c(cfg$evaluator$env_vars, prereq$smoke_env_vars)
   env_str <- vapply(seq_along(env_kvs), function(i)
                     sprintf("%s=%s", names(env_kvs)[i], env_kvs[[i]]),
                     character(1))
 
+  err_file <- tempfile(fileext = ".txt")
   status <- system2("Rscript", c("--vanilla", shQuote(cfg$target_script)),
-                    env = env_str, stdout = NULL, stderr = NULL)
+                    env = env_str, stdout = NULL, stderr = err_file)
   if (status != 0) {
+    tail_msg <- if (file.exists(err_file))
+                   paste(utils::tail(readLines(err_file, warn = FALSE), 6L),
+                         collapse = "\n") else ""
     return(list(pass = FALSE,
-                reason = sprintf("evaluator exited non-zero (status=%d)", status)))
+                reason = sprintf("evaluator exited non-zero (status=%d)%s",
+                                 status,
+                                 if (nzchar(tail_msg))
+                                   sprintf(":\n%s", tail_msg) else "")))
   }
   out_path <- cfg$evaluator$results_file_pattern
   if (!file.exists(out_path)) {
@@ -114,5 +123,6 @@ check_column_presence <- function(prereq, cfg) {
                   reason = sprintf("column %s contains NA", col)))
     }
   }
-  list(pass = TRUE, reason = "all required columns present and numeric")
+  list(pass = TRUE,
+       reason = "all required columns present, numeric, and NA-free")
 }
