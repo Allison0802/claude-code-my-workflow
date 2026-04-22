@@ -61,6 +61,27 @@ Rscript scripts/R/filename.R
 
 ---
 
+## Longleaf / SLURM Submit Scripts
+
+**Always use `$SLURM_SUBMIT_DIR` for the working directory — never `$(dirname "${BASH_SOURCE[0]}")`.**
+
+Canonical idiom (used by all `submit_missing_types_*.sh` and the fixed `submit_carra_*.sh`):
+
+```bash
+WORKDIR="${SLURM_SUBMIT_DIR:-$PWD}"
+cd "${WORKDIR}"
+mkdir -p "${WORKDIR}/logs"
+mkdir -p "${WORKDIR}/results_<scenario>"
+```
+
+**Why:** Under SLURM, `slurmd` may stage the script to `/var/spool/slurmd/<job>/` and run it from there, so `BASH_SOURCE[0]` resolves to a system path the user cannot write to. `mkdir: cannot create directory 'logs': Permission denied` across every array task is the signature. `SLURM_SUBMIT_DIR` is always set to the directory `sbatch` was invoked from, which the user owns.
+
+**Also:** `#SBATCH --output=logs/...` opens the log file *before* the script runs. Create `logs/` at submit time (`mkdir -p logs results_<scenario> && sbatch ...`) so the first job's stderr lands somewhere, not just rely on the script's own `mkdir`.
+
+This mistake cost one full array submission cycle on 2026-04-21 (7 CARRA CCA tasks lost before the fix landed in commit `c2e86a3`).
+
+---
+
 ## Sub-Project Hybrid Model
 
 Parent repo is shared config hub for two sub-projects (separate git repos):
