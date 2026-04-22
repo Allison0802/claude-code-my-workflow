@@ -97,9 +97,9 @@ test_that("validate_proposal dispatcher errors on unknown slot.kind", {
                "unknown slot.kind")
 })
 
-test_that("hyperparameters stub errors with informative message", {
-  expect_error(validate_hyperparameters(list(), list(kind = "hyperparameters")),
-               "not yet implemented")
+test_that("validate_hyperparameters returns invalid for empty payload", {
+  res <- validate_hyperparameters(list(), list(kind = "hyperparameters", params = list()))
+  expect_false(res$grammar_valid)
 })
 
 test_that("formula stub errors with informative message", {
