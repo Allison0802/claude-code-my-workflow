@@ -1,4 +1,4 @@
-# Phase -1: prerequisites. Owns the IBS patch and (T2) baseline meta sidecars.
+# Phase -1: prerequisites. Owns the IBS patch, baseline meta sidecars, and column-presence checks.
 
 IBS_PATCH_VERSION <- 1L
 IBS_STAMP_RE <- "# ibs-patch-version:\\s*([0-9]+)"
@@ -71,4 +71,48 @@ check_sidecar_meta <- function(prereq, cfg) {
     }
   }
   list(pass = TRUE, reason = "all sidecar-meta keys match")
+}
+
+#' Run the evaluator in smoke mode and verify named columns are present.
+#'
+#' @param prereq list with: id, type ("column-presence"),
+#'   smoke_env_vars (named list), required_columns (chr vec).
+#' @param cfg full config; uses cfg$target_script and
+#'   cfg$evaluator$results_file_pattern.
+#' @return list(pass, reason).
+check_column_presence <- function(prereq, cfg) {
+  env_kvs <- c(prereq$smoke_env_vars, cfg$evaluator$env_vars)
+  env_str <- vapply(seq_along(env_kvs), function(i)
+                    sprintf("%s=%s", names(env_kvs)[i], env_kvs[[i]]),
+                    character(1))
+
+  status <- system2("Rscript", c("--vanilla", shQuote(cfg$target_script)),
+                    env = env_str, stdout = NULL, stderr = NULL)
+  if (status != 0) {
+    return(list(pass = FALSE,
+                reason = sprintf("evaluator exited non-zero (status=%d)", status)))
+  }
+  out_path <- cfg$evaluator$results_file_pattern
+  if (!file.exists(out_path)) {
+    return(list(pass = FALSE,
+                reason = sprintf("results file not found at %s", out_path)))
+  }
+  df <- readRDS(out_path)
+  missing <- setdiff(prereq$required_columns, names(df))
+  if (length(missing) > 0) {
+    return(list(pass = FALSE,
+                reason = sprintf("missing columns: %s",
+                                 paste(missing, collapse = ", "))))
+  }
+  for (col in prereq$required_columns) {
+    if (!is.numeric(df[[col]])) {
+      return(list(pass = FALSE,
+                  reason = sprintf("column %s is not numeric", col)))
+    }
+    if (anyNA(df[[col]])) {
+      return(list(pass = FALSE,
+                  reason = sprintf("column %s contains NA", col)))
+    }
+  }
+  list(pass = TRUE, reason = "all required columns present and numeric")
 }
