@@ -157,7 +157,15 @@ cmd_promote <- function(opts) {
          res$rows, res$manifest_path, res$submitted)
   invisible(TRUE)
 }
-cmd_ingest  <- function(opts) me_stop("ingest not yet implemented (T25)")
+cmd_ingest  <- function(opts) {
+  od <- resolve_out_dir(opts)
+  cfg <- load_yaml_config(opts[["config-path"]] %||%
+    me_stop("ingest: --config-path=PATH required"))
+  res <- ingest_run(cfg, od)
+  me_log("INFO", "ingest: patched %d of %d records",
+         res$patched, res$db_records)
+  invisible(TRUE)
+}
 cmd_report  <- function(opts) me_stop("report not yet implemented (T26)")
 
 main <- function() {
