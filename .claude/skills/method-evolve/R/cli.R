@@ -166,7 +166,16 @@ cmd_ingest  <- function(opts) {
          res$patched, res$db_records)
   invisible(TRUE)
 }
-cmd_report  <- function(opts) me_stop("report not yet implemented (T26)")
+cmd_report  <- function(opts) {
+  od <- resolve_out_dir(opts)
+  cfg <- load_yaml_config(opts[["config-path"]] %||%
+    me_stop("report: --config-path=PATH required"))
+  res <- report_run(cfg, od)
+  me_log("INFO", "report: leaderboard at %s", res$leaderboard)
+  for (p in res$plots)
+    me_log("INFO", "report: plot at %s", p)
+  invisible(TRUE)
+}
 
 main <- function() {
   args <- commandArgs(trailingOnly = TRUE)
