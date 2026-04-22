@@ -102,7 +102,8 @@ test_that("validate_hyperparameters returns invalid for empty payload", {
   expect_false(res$grammar_valid)
 })
 
-test_that("formula stub errors with informative message", {
-  expect_error(validate_formula(list(), list(kind = "formula")),
-               "not yet implemented")
+test_that("validate_formula returns invalid for empty payload", {
+  res <- validate_formula(list(), list(kind = "formula"))
+  expect_false(res$grammar_valid)
+  expect_match(res$failure_reason, "missing payload")
 })
