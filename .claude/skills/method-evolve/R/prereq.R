@@ -126,3 +126,45 @@ check_column_presence <- function(prereq, cfg) {
   list(pass = TRUE,
        reason = "all required columns present, numeric, and NA-free")
 }
+
+#' Custom shell-out prerequisite: runs `check_command` via system();
+#' zero exit => pass, non-zero => fail.
+#'
+#' @param prereq list with: id, type ("custom"), check_command (chr)
+#' @param cfg ignored (present for dispatcher uniformity)
+#' @return list(pass, reason)
+check_custom <- function(prereq, cfg) {
+  status <- system(prereq$check_command, intern = FALSE,
+                   ignore.stdout = TRUE, ignore.stderr = TRUE)
+  if (status == 0) {
+    list(pass = TRUE, reason = "custom check returned zero")
+  } else {
+    list(pass = FALSE,
+         reason = sprintf("custom check returned non-zero exit (status=%d)",
+                          status))
+  }
+}
+
+#' Dispatch a prereq to its type-specific handler.
+#'
+#' @param prereq list with at least $id and $type.
+#' @param cfg full config.
+#' @return list(pass, reason).
+run_prereq_check <- function(prereq, cfg) {
+  switch(prereq$type,
+    `source-patch`    = {
+      # T1's applicator suite: verify the stamp on prereq$target against
+      # prereq$required_version.
+      ok <- has_ibs_patch(prereq$target,
+                          required_version = prereq$required_version %||% 1L)
+      if (ok) list(pass = TRUE, reason = "source patch stamped at required version")
+      else    list(pass = FALSE,
+                   reason = sprintf("source patch missing or below required version on %s",
+                                    prereq$target))
+    },
+    `sidecar-meta`    = check_sidecar_meta(prereq, cfg),
+    `column-presence` = check_column_presence(prereq, cfg),
+    `custom`          = check_custom(prereq, cfg),
+    me_stop("unknown prereq type: %s", prereq$type)
+  )
+}
