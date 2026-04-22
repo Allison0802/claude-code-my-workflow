@@ -147,7 +147,16 @@ cmd_run <- function(opts) {
   invisible(TRUE)
 }
 
-cmd_promote <- function(opts) me_stop("promote not yet implemented (T24)")
+cmd_promote <- function(opts) {
+  od <- resolve_out_dir(opts)
+  cfg <- load_yaml_config(opts[["config-path"]] %||%
+    me_stop("promote: --config-path=PATH required"))
+  dry <- isTRUE(opts[["dry-run"]])
+  res <- promote_run(cfg, od, dry_run = dry)
+  me_log("INFO", "promote: %d rows, manifest at %s, submitted=%s",
+         res$rows, res$manifest_path, res$submitted)
+  invisible(TRUE)
+}
 cmd_ingest  <- function(opts) me_stop("ingest not yet implemented (T25)")
 cmd_report  <- function(opts) me_stop("report not yet implemented (T26)")
 
