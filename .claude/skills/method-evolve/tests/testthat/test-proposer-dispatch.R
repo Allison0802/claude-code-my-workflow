@@ -68,3 +68,20 @@ test_that("render_proposer_prompt fills feature_set template", {
   expect_match(out, "whitelist: a, b", fixed = TRUE)
   expect_match(out, "feature_set_expr", fixed = TRUE)
 })
+
+test_that("render_proposer_prompt fills hyperparameters template", {
+  slot_cfg <- list(kind = "hyperparameters",
+                   params = list(
+                     mtry      = list(type = "integer",
+                                      range = c(1, 20)),
+                     splitrule = list(type = "categorical",
+                                      enum = c("gini", "extratrees"))
+                   ))
+  class(slot_cfg) <- c("hyperparameters", "list")
+  out <- render_proposer_prompt(slot_cfg, parents = list(),
+                                neg_examples = list(), batch_size = 4L)
+  expect_false(grepl("\\{\\{", out))
+  expect_match(out, "mtry: type=integer", fixed = TRUE)
+  expect_match(out, "enum=\\[gini,extratrees\\]")
+  expect_match(out, '"hyperparameters"', fixed = TRUE)
+})

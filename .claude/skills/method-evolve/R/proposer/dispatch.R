@@ -114,3 +114,21 @@ format_grammar.feature_set <- function(slot_cfg) {
   ), collapse = "
 ")
 }
+
+#' @export
+format_grammar.hyperparameters <- function(slot_cfg) {
+  paste(vapply(names(slot_cfg$params %||% list()), function(k) {
+    spec <- slot_cfg$params[[k]]
+    parts <- c(sprintf("- %s: type=%s", k, spec$type))
+    if (!is.null(spec$range))
+      parts <- c(parts, sprintf("range=[%s,%s]",
+                                 spec$range[1], spec$range[2]))
+    if (!is.null(spec$enum))
+      parts <- c(parts, sprintf("enum=[%s]",
+                                 paste(spec$enum, collapse = ",")))
+    if (isTRUE(spec$log_scale))
+      parts <- c(parts, "log_scale=true")
+    paste(parts, collapse = ", ")
+  }, character(1)), collapse = "
+")
+}
