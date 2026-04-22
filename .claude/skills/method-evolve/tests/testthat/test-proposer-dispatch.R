@@ -54,3 +54,17 @@ test_that("load_proposer_template errors on unknown slot_kind", {
   expect_error(load_proposer_template("bogus"),
                "proposer template not found")
 })
+
+test_that("render_proposer_prompt fills feature_set template", {
+  slot_cfg <- list(kind = "feature_set", whitelist = c("a","b"),
+                   transforms = list(list(name = "log")),
+                   interactions = "pairwise", max_terms = 5L,
+                   forbidden_patterns = character())
+  class(slot_cfg) <- c("feature_set", "list")
+  out <- render_proposer_prompt(slot_cfg, parents = list(),
+                                neg_examples = list(), batch_size = 3L)
+  # Placeholders all replaced (no {{X}} survives)
+  expect_false(grepl("\\{\\{", out))
+  expect_match(out, "whitelist: a, b", fixed = TRUE)
+  expect_match(out, "feature_set_expr", fixed = TRUE)
+})

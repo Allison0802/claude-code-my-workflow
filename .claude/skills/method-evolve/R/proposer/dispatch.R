@@ -95,3 +95,22 @@ parse_proposer_response <- function(raw_text, slot_kind) {
   }
   list(ok = TRUE, proposals = parsed)
 }
+
+#' @export
+format_grammar.feature_set <- function(slot_cfg) {
+  paste(c(
+    sprintf("- whitelist: %s",
+            paste(slot_cfg$whitelist %||% character(), collapse = ", ")),
+    sprintf("- transforms: %s",
+            paste(vapply(slot_cfg$transforms %||% list(),
+                         function(t) t$name, character(1)),
+                  collapse = ", ")),
+    sprintf("- interactions: %s", slot_cfg$interactions %||% "pairwise"),
+    sprintf("- max_terms: %d", slot_cfg$max_terms %||% 5L),
+    if (length(slot_cfg$forbidden_patterns %||% character()))
+      sprintf("- forbidden_patterns: %s",
+              paste(slot_cfg$forbidden_patterns, collapse = ", "))
+    else NULL
+  ), collapse = "
+")
+}
