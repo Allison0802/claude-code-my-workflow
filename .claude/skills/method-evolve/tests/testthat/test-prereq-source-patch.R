@@ -26,7 +26,7 @@ test_that("apply_ibs_patch prepends the patch and writes the stamp", {
   tmp <- tempfile(fileext = ".R")
   writeLines(c("# original header", "body <- TRUE"), tmp)
   patch <- file.path(here::here(), ".claude", "skills", "method-evolve",
-                     "templates", "prereq_ibs.R.patch")
+                     "examples", "missing_types_ipw", "templates", "prereq_ibs.R.patch")
   apply_ibs_patch(tmp, patch_path = patch)
   expect_true(has_ibs_patch(tmp, required_version = 1L))
   expect_match(paste(readLines(tmp), collapse = "\n"), "body <- TRUE", fixed = TRUE)
@@ -36,7 +36,7 @@ test_that("apply_ibs_patch is idempotent", {
   tmp <- tempfile(fileext = ".R")
   writeLines(c("# original"), tmp)
   patch <- file.path(here::here(), ".claude", "skills", "method-evolve",
-                     "templates", "prereq_ibs.R.patch")
+                     "examples", "missing_types_ipw", "templates", "prereq_ibs.R.patch")
   apply_ibs_patch(tmp, patch_path = patch)
   before <- paste(readLines(tmp), collapse = "\n")
   apply_ibs_patch(tmp, patch_path = patch)
