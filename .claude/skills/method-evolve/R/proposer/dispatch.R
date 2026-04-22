@@ -132,3 +132,12 @@ format_grammar.hyperparameters <- function(slot_cfg) {
   }, character(1)), collapse = "
 ")
 }
+
+#' @export
+format_grammar.formula <- function(slot_cfg) {
+  fs_grammar <- format_grammar.feature_set(slot_cfg)
+  paste(c(sprintf("- lhs (fixed): %s", slot_cfg$lhs %||% "<unspecified>"),
+          fs_grammar),
+        collapse = "
+")
+}

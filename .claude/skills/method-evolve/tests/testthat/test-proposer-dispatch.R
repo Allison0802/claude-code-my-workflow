@@ -85,3 +85,18 @@ test_that("render_proposer_prompt fills hyperparameters template", {
   expect_match(out, "enum=\\[gini,extratrees\\]")
   expect_match(out, '"hyperparameters"', fixed = TRUE)
 })
+
+test_that("render_proposer_prompt fills formula template with fixed LHS", {
+  slot_cfg <- list(kind = "formula",
+                   lhs = "Surv(time, event)",
+                   whitelist = c("x1", "x2"),
+                   transforms = list(list(name = "log")),
+                   interactions = "pairwise", max_terms = 4L,
+                   forbidden_patterns = character())
+  class(slot_cfg) <- c("formula", "list")
+  out <- render_proposer_prompt(slot_cfg, parents = list(),
+                                neg_examples = list(), batch_size = 2L)
+  expect_false(grepl("\\{\\{", out))
+  expect_match(out, "lhs (fixed): Surv(time, event)", fixed = TRUE)
+  expect_match(out, "formula_str", fixed = TRUE)
+})
