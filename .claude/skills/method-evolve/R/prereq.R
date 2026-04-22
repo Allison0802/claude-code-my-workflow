@@ -24,3 +24,51 @@ apply_ibs_patch <- function(target_path, patch_path) {
   me_log("INFO", "Applied IBS patch v%d to %s", IBS_PATCH_VERSION, target_path)
   invisible(TRUE)
 }
+
+#' Verify that named baselines have accompanying .meta.json sidecars
+#' whose hard keys match the configuration.
+#'
+#' @param prereq A prerequisite spec list with fields:
+#'   id (str), type ("sidecar-meta"), required_for (chr vec of baseline names),
+#'   required_keys (chr vec of JSON keys to compare; default below).
+#' @param cfg The full parsed config.yaml (must contain $baselines and
+#'   $evaluator$env_vars).
+#' @return list(pass = logical, reason = character).
+check_sidecar_meta <- function(prereq, cfg) {
+  default_keys <- c("scenario_name", "n_subjects", "n_sims",
+                    "dgp_version", "evaluator_sha")
+  keys <- prereq$required_keys %||% default_keys
+
+  # config-side values (drawn from evaluator.env_vars where present)
+  cfg_vals <- list(
+    scenario_name = cfg$evaluator$env_vars$SCENARIO_NAME,
+    n_subjects    = as.integer(cfg$evaluator$env_vars$N_SUBJECTS %||% NA),
+    n_sims        = as.integer(cfg$evaluator$env_vars$N_SIMS %||% NA)
+  )
+
+  for (b in prereq$required_for) {
+    bcfg <- cfg$baselines[[b]]
+    if (is.null(bcfg) || is.null(bcfg$meta_file)) {
+      return(list(pass = FALSE,
+                  reason = sprintf("baseline '%s': meta_file not declared", b)))
+    }
+    if (!file.exists(bcfg$meta_file)) {
+      return(list(pass = FALSE,
+                  reason = sprintf("baseline '%s': meta file missing at %s",
+                                   b, bcfg$meta_file)))
+    }
+    meta <- jsonlite::read_json(bcfg$meta_file, simplifyVector = TRUE)
+    for (k in keys) {
+      if (!k %in% names(cfg_vals)) next  # evaluator_sha & dgp_version: warn-only
+      if (!identical(meta[[k]], cfg_vals[[k]])) {
+        return(list(pass = FALSE,
+                    reason = sprintf(
+                      "baseline '%s': key %s mismatch (meta=%s, config=%s)",
+                      b, k,
+                      paste(meta[[k]], collapse = ","),
+                      paste(cfg_vals[[k]], collapse = ","))))
+      }
+    }
+  }
+  list(pass = TRUE, reason = "all sidecar-meta keys match")
+}
