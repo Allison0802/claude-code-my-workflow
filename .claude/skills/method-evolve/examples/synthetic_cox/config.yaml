@@ -1,0 +1,88 @@
+name: synthetic-cox-smoke
+target_script: .claude/skills/method-evolve/examples/synthetic_cox/toy_evaluator.R
+
+prerequisites:
+  - id: emit-extra-metric
+    type: custom
+    check_command: 'grep -q "emit-extra-metric-patch-version: 1" .claude/skills/method-evolve/examples/synthetic_cox/toy_evaluator.R'
+  - id: baseline-meta
+    type: sidecar-meta
+    required_for: [lower, upper]
+    required_keys: [scenario_name, n_subjects, n_sims]
+  - id: required-columns
+    type: column-presence
+    smoke_env_vars:
+      SCENARIO_NAME: smoke
+      N_SIMS: 2
+      N_SUBJECTS: 50
+    required_columns: [my_metric, c_index, abs_bias, coverage]
+
+evaluator:
+  env_vars:
+    SCENARIO_NAME: smoke
+    N_SIMS: 50
+    N_SUBJECTS: 200
+  # Pattern tokens ${SCENARIO_NAME}/${VARIANT_ID} are not yet interpolated
+  # by the prereq column-presence check (follow-up item). For smoke mode,
+  # the evaluator writes /tmp/synth_cox_<SCENARIO_NAME>_<VARIANT_ID or "var">.rds.
+  results_file_pattern: /tmp/synth_cox_smoke_var.rds
+
+substitutions:
+  freeze_on_setup: [run_date, name]
+  per_variant: [VARIANT_PATH, VARIANT_ID, SEED_BLOCK, SCENARIO_NAME]
+  refreeze_behavior: error
+
+slot:
+  kind: feature_set
+  max_terms: 6
+  whitelist: [x1, x2, x3, x4, x5, x6]
+  transforms:
+    - { name: log,    head: log, arity: 1 }
+    - { name: square, head: I,   arity: 1, shape: "I(<base>^2)" }
+  interactions: pairwise
+  forbidden_patterns: []
+
+baselines:
+  scenario_match_required: true
+  lower:
+    results_file: .claude/skills/method-evolve/examples/synthetic_cox/baselines/lower.rds
+    meta_file:    .claude/skills/method-evolve/examples/synthetic_cox/baselines/lower.meta.json
+  upper:
+    results_file: .claude/skills/method-evolve/examples/synthetic_cox/baselines/upper.rds
+    meta_file:    .claude/skills/method-evolve/examples/synthetic_cox/baselines/upper.meta.json
+
+fitness:
+  primary:
+    template: recovery_ratio
+    target: my_metric
+    lower: lower.my_metric
+    upper: upper.my_metric
+    direction: higher_is_better
+  recovery:
+    denom_floor_epsilon: 0.002
+    degenerate_scenario_action: reject_and_halt
+    degenerate_variant_fallback:
+      fallback_metric: c_index
+      cap: 0
+
+gates:
+  - { metric: abs_bias, tier: both,   op: "<",  threshold: 0.5 }
+  - { metric: coverage, tier: screen, op: in,   range: [0.85, 1.00] }
+  - { metric: c_index,  tier: both,   op: ">=", threshold: 0.55 }
+
+budget:
+  max_variants: 20
+  batch_size: 4
+  max_generations: 3
+  promote_top_k: 3
+  early_stop_after: 2
+
+compute:
+  screen: { backend: local, n_workers: 2 }
+  full:   { backend: local }
+
+paths:
+  out_dir: quality_reports/evolve/synthetic-cox-smoke
+  variants_dir: quality_reports/evolve/synthetic-cox-smoke/variants
+  program_db: quality_reports/evolve/synthetic-cox-smoke/PROGRAM_DB.jsonl
+  state_file: quality_reports/evolve/synthetic-cox-smoke/EVOLVE_STATE.json

@@ -1,0 +1,7 @@
+--- a/toy_evaluator.R
++++ b/toy_evaluator.R
+@@ -1,3 +1,5 @@
+ # examples/synthetic_cox/toy_evaluator.R
++# emit-extra-metric-patch-version: 1
++# (no-op patch — demonstrates prereq applicator + version stamping)
+ # Tiny Cox-survival evaluator for method-evolve smoke tests.
