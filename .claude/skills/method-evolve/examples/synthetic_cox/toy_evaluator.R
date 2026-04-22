@@ -38,6 +38,15 @@ fexpr <- if (!is.null(variant_f) && file.exists(variant_f)) {
   v$feature_set_expr %||% default_fexpr
 } else default_fexpr
 
+# Additional payload shapes supported by the toy evaluator:
+hp         <- NULL
+formula_s  <- NULL
+if (!is.null(variant_f) && file.exists(variant_f)) {
+  v <- readRDS(variant_f)
+  if (!is.null(v$hyperparameters)) hp <- v$hyperparameters
+  if (!is.null(v$formula_str))     formula_s <- v$formula_str
+}
+
 simulate_one <- function() {
   X <- matrix(rnorm(n * 6), n, 6); colnames(X) <- paste0("x", 1:6)
   lp <- 0.5 * X[, 1] - 0.3 * X[, 2] + 0.2 * X[, 1] * X[, 3]
@@ -47,11 +56,19 @@ simulate_one <- function() {
   data.frame(time = time, event = event, X)
 }
 
-score_one <- function(fexpr) {
+score_one <- function(fexpr, hp = NULL, formula_s = NULL) {
   d <- simulate_one()
-  rhs <- paste(fexpr, collapse = " + ")
-  fml <- as.formula(sprintf("Surv(time, event) ~ %s", rhs))
-  fit <- tryCatch(coxph(fml, data = d), error = function(e) NULL)
+  fml <- if (!is.null(formula_s))
+           as.formula(formula_s)
+         else {
+           rhs <- paste(fexpr, collapse = " + ")
+           as.formula(sprintf("Surv(time, event) ~ %s", rhs))
+         }
+  ctrl <- if (!is.null(hp) && !is.null(hp$iter_max))
+            coxph.control(iter.max = as.integer(hp$iter_max))
+          else coxph.control()
+  fit <- tryCatch(coxph(fml, data = d, control = ctrl),
+                  error = function(e) NULL)
   if (is.null(fit))
     return(c(my_metric = NA_real_, c_index = NA_real_,
              abs_bias = NA_real_, coverage = NA_real_))
@@ -69,7 +86,8 @@ score_one <- function(fexpr) {
     abs_bias  = as.numeric(bias),  coverage = as.numeric(cov_ok))
 }
 
-scores <- replicate(n_sims, score_one(fexpr), simplify = TRUE)
+scores <- replicate(n_sims, score_one(fexpr, hp = hp, formula_s = formula_s),
+                    simplify = TRUE)
 out <- as.data.frame(t(scores))
 dir.create(dirname(out_path), recursive = TRUE, showWarnings = FALSE)
 saveRDS(out, out_path)
