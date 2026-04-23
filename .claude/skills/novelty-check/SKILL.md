@@ -13,7 +13,9 @@ Check whether a proposed method/idea has already been done in the literature: **
 
 - REVIEWER_MODEL = `gpt-5.4` — Model used via Codex MCP. Must be an OpenAI model (e.g., `gpt-5.4`, `o3`, `gpt-4o`)
 
-**Reviewer fallback & NotebookLM:** When Codex MCP is unavailable, this skill falls back to a Claude subagent reviewer — **always use `model: "opus"`** in the Agent call. Before implementing CRITICAL/MAJOR changes from reviews, consult NotebookLM. See `.claude/rules/codex-fallback-protocol.md` for full protocol.
+**Reviewer fallback & NotebookLM:** When Codex MCP is unavailable, this skill falls back to a Claude subagent reviewer — **default to `model: "sonnet"`** in the Agent call (override to `"opus"` only if the user explicitly requests a stronger reviewer). Before implementing CRITICAL/MAJOR changes from reviews, consult NotebookLM. See `.claude/rules/codex-fallback-protocol.md` for full protocol.
+
+> **Skill-specific deviation from the shared protocol.** `codex-fallback-protocol.md` §2 mandates `model: "opus"` for all subagent fallbacks. novelty-check intentionally overrides this to `sonnet` because the task is lightweight literature cross-checking, not deep mathematical or methodological review — sonnet is fast enough and adequate here. Other skills (method-derive, research-refine, paper reviews) continue to follow the protocol's opus requirement.
 
 ## Instructions
 
