@@ -1,0 +1,2 @@
+QUESTION: Your novelty claim is that this is the first pseudo-observation estimator for competing risks under MAR censoring. How do you distinguish it from Overgaard et al. 2017, which does the same under a more general censoring model?
+THEMATIC_QUERY: pseudo-observation estimators competing risks MAR dependent censoring Overgaard 2017

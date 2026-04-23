@@ -1,0 +1,4 @@
+CONFRONTATION: The thematic notebook returned Overgaard 2017 Section 4.1 which proves consistency under exactly your MAR assumption. Your method reduces to their estimator when the weight function is constant. Defend the novelty claim.
+---FIXTURE_SEPARATOR---
+JUDGMENT: cited
+SEVERITY: clean

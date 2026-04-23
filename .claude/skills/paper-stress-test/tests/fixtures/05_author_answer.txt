@@ -1,0 +1,9 @@
+ANSWER: The paper addresses this in Section 4.2 where it explicitly assumes clusters are analyzed as independent units under the randomization design. The key passage is the sentence following equation (12).
+
+CITATIONS:
+- "treating each cluster as an independent observation under the randomization-based identification argument" — Section 4.2, paragraph 2
+- "cluster-level SUTVA follows from the randomization design; see Appendix B.3 for a formal proof" — Section 4.2, paragraph 3
+---FIXTURE_SEPARATOR---
+ANSWER: the paper does not address this. The closest adjacent content is a brief mention of spillover in the Discussion (Section 7) but no formal treatment appears anywhere.
+
+CITATIONS: none

@@ -1,0 +1,1 @@
+QUESTION: The paper claims SUTVA holds but never explicitly addresses spillover between treatment clusters in Section 4.2. How do you justify independence across the clusters you actually analyzed?
