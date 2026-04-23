@@ -58,7 +58,7 @@ Return ONLY a response in that format, nothing else.
 
 ### Patterns
 
-All regexes below are POSIX-extended, multiline, case-sensitive unless noted. Matches may span newlines where `(?s)` is applied. Whitespace around field values must be trimmed on capture.
+All regexes below are PCRE-compatible extended regexes (Python `re`-compatible), multiline mode. Apply DOTALL (`(?s)` or `re.DOTALL`) when matching Patterns 1–5, which capture multi-line text with `.+?` lookaheads; do NOT apply DOTALL to the single-line field anchors in Pattern 2 (`JUDGMENT`, `NEXT`, `SEVERITY`), as those use `$` end-of-line anchors. Whitespace around field values must be trimmed on capture.
 
 #### 1. Reviewer primary-question turn
 
@@ -84,7 +84,7 @@ Validation: JUDGMENT must match the enum exactly. REASONING must be non-empty. I
 #### 3. Reviewer Lens 7 initial turn
 
 ```
-^QUESTION:[[:space:]]*(.+?)(?=\nTHEMATIC_QUERY:)
+^QUESTION:[[:space:]]*(.+?)(?=\n[A-Z_]+:|\z)
 ^THEMATIC_QUERY:[[:space:]]*(.+?)(?=\n[A-Z_]+:|\z)
 ```
 
@@ -144,7 +144,7 @@ The `novelty-check` skill's Phase D output. Regexes:
 overall_score:      Score:[[:space:]]*(\d+)/10
 recommendation:     Recommendation:[[:space:]]*(PROCEED WITH CAUTION|PROCEED|ABANDON)
 key_differentiator: Key differentiator:[[:space:]]*(.+?)(?=\n-|\n##|\z)
-closest_prior_work: Closest Prior Work[[:space:]]*\n(\|.+\|\n)+
+closest_prior_work: Closest Prior Work[[:space:]]*\n((?:\|.+\|\n)+)
 ```
 
 For `closest_prior_work`, split each table row on `|` (strip pipes and whitespace), skip the header row and separator row, build a `{paper, year, venue, overlap, key_difference}` object per remaining row.
