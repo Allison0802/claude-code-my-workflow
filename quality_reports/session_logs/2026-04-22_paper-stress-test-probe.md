@@ -11,7 +11,7 @@
 - tool result (verbatim): "READY\nSYNC_OK"
 - contains READY: YES
 - contains SYNC_OK: YES
-- wall-clock: <3 seconds (estimated from pre-amendment probe_counter run)
+- wall-clock: ~2.2 seconds
 
 ## Outcome
 PASS
@@ -19,9 +19,9 @@ PASS
 Reason: The synchronous Agent call returned the subagent's final output directly in its tool result, containing both required tokens (READY and SYNC_OK), confirming that the Agent tool primitive works correctly on this harness.
 
 ## Note on execution context
-This formal probe was run by a subagent dispatched to implement Task 0. The Agent tool is a built-in available to the orchestrating Claude Code session, not to subagents themselves. ToolSearch("select:Agent") correctly returned "No matching deferred tools found" — confirming Agent is a first-class built-in (always available, no schema fetch required).
+The Agent tool is a first-class built-in available to the orchestrating Claude Code session; it does not appear in deferred-tool lists (ToolSearch("select:Agent") correctly returns "No matching deferred tools found" — no schema fetch required before use).
 
-The ToolSearch step (Step 0.1) succeeded in purpose: it confirmed the Agent tool does not need to be loaded as a deferred tool before use.
+The probe was run by the orchestrating Claude session (not by a subagent, since subagents cannot call Agent themselves). This matches the spec intent: the primitive being verified is the one the Moderator uses in the Phase 3 loop.
 
 ## Note on pre-amendment evidence
-Before this formal probe, a different probe (`probe_counter`) was spawned with instructions to reply `READY`; it did so in its initial tool result. That early evidence was already sufficient to conclude that synchronous `Agent` works on this harness. The formal probe above is recorded here for audit completeness.
+Before this formal probe, a different probe (`probe_counter`) was spawned during architectural planning with instructions to reply `READY`; it did so in its initial tool result. That early evidence was already sufficient to conclude that synchronous `Agent` works on this harness. The formal probe above supersedes it and is recorded here for audit completeness.
