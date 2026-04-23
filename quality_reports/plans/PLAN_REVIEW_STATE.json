@@ -5,16 +5,17 @@
   "last_verdict": "pass",
   "failed_criteria": [],
   "reviewer_backend": "claude-subagents",
-  "reviewer_agent_id_round_1": "ab2561d25bda376de",
-  "rewriter_agent_id_round_1": "aed0e01d0f7f3be6c",
-  "reviewer_agent_id_round_2": "ab8aaec9ff871d3f5",
-  "plan_source": "quality_reports/specs/2026-04-21_method-evolve-design.md",
+  "reviewer_agent_id_round_1": "a0a71a01bf05d06d6",
+  "reviewer_agent_id_round_2": "abb19197548f9730a",
+  "rewriter": "user-direct-edit (between Round 1 and Round 2)",
+  "plan_source": "quality_reports/plans/2026-04-22_paper-stress-test-implementation.md",
   "final_plan": "quality_reports/plans/FINAL_PLAN.md",
+  "human_checkpoint": true,
   "non_blocking_items": [
-    "Phase 0 scan tie-break rule (cosmetic)",
-    "--refreeze data-safety guard (implementation-time)",
-    "Gate-threshold trade-off framing (cosmetic)",
-    "Zero-gate-passer smoke synthesis acceptable as-is"
+    "T10 pseudocode cleanup: replace summarize_exchange(...) with lens_record['summary_for_compaction'] lookup",
+    "Known-caveats stub for Sonnet 'conceded' severity asymmetry",
+    "Optional flock/PID sidecar for concurrent-same-slug protection in Phase 0"
   ],
-  "timestamp": "2026-04-21T16:25:00-04:00"
+  "plan_growth_lines": "3189 -> 3539 (+350)",
+  "timestamp": "2026-04-22T21:15:00-04:00"
 }

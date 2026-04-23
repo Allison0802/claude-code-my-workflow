@@ -1,7 +1,7 @@
 ---
 name: paper-stress-test
 description: Upload a paper to NotebookLM, run an automated adversarial debate between an Opus Reviewer subagent and a Sonnet Author-surrogate subagent (with concurrent novelty-check sub-call), and produce a structured briefing with cite/build-on/flag/skip recommendation. Use when the user says "stress test this paper", "adversarial read of this paper", "brief me on this paper", "help me read this paper", "is this paper's claim real", or wants deep single-paper interrogation rather than surface-level summary. Not for reviewing the user's own manuscripts (use review-paper) or multi-paper synthesis (use lit-review).
-argument-hint: "<paper-path-or-arxiv-id> [--depth N] [--type T] [--cross-check NB] [--skip-novelty] [--resume <slug>]"
+argument-hint: "<paper-path-or-arxiv-id> [--depth N] [--type T] [--cross-check NB] [--skip-novelty] [--no-checkpoint] [--resume <slug>]"
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, mcp__notebooklm__notebook_create, mcp__notebooklm__notebook_delete, mcp__notebooklm__notebook_list, mcp__notebooklm__source_add, mcp__notebooklm__notebook_query
 ---
 
@@ -286,7 +286,7 @@ By the end of Phase 0, the Moderator has:
 - A full slug
 - Output directories created
 - User confirmation that this is a fresh run (or a resumption starting from Phase 3)
-- Parsed flags: `depth`, `type_override`, `cross_check_override`, `skip_novelty`
+- Parsed flags: `depth`, `type_override`, `cross_check_override`, `skip_novelty`, `human_checkpoint`
 ## Phase 1 — NotebookLM setup
 
 ### Step 1.1: Create disposable notebook
@@ -357,7 +357,8 @@ Write `${OUT_ROOT}/state/${FULL_SLUG}_state.json` with:
     "depth": <parsed>,
     "type_override": <parsed or null>,
     "cross_check_override": <parsed or null>,
-    "skip_novelty": <parsed boolean>
+    "skip_novelty": <parsed boolean>,
+    "human_checkpoint": <parsed boolean, default true>
   },
   "notebooks": {
     "disposable": {
@@ -383,7 +384,7 @@ Write `${OUT_ROOT}/state/${FULL_SLUG}_state.json` with:
   "compaction_history": [],
   "spawn_count": 0,
   "spawn_budget": 80,
-  "wall_clock_start": "<ISO 8601 — set exactly once when Phase 0 begins>",
+  "wall_clock_start": null,
   "wall_clock_budget_s": 1800,
   "abort_reason": null,
   "moderator_own_context_est_chars": 0,
@@ -395,7 +396,7 @@ Write `${OUT_ROOT}/state/${FULL_SLUG}_state.json` with:
 
 **Schema note (amended 2026-04-22):** The fields `reviewer_subagent`, `author_subagent`, and `reseed_history` that appeared in pre-amendment drafts are **removed**. Under the transcript-relay architecture there are no persistent subagent handles; `transcript` is the full turn-by-turn record (array of reviewer/author/moderator records per §Architecture Amendment), `moderator_assessments` is a flat index of the per-round Moderator entries for Phase 4 synthesis, and `compaction_history` replaces the old reseed-history field.
 
-**Run-budget fields** (`spawn_count`, `spawn_budget`, `wall_clock_start`, `wall_clock_budget_s`, `abort_reason`, `moderator_own_context_est_chars`) are declared and documented in T11 Step 3.8.5; `wall_clock_start` is captured once here in Phase 0 and is not reset on resume. Full enforcement semantics live in T7 Step 3.4 (budget gate at lens-loop top) and T10 (Moderator own-context soft budget).
+**Run-budget fields** (`spawn_count`, `spawn_budget`, `wall_clock_start`, `wall_clock_budget_s`, `abort_reason`, `moderator_own_context_est_chars`) are declared and documented in T11 Step 3.8.5; `wall_clock_start` is initialized as `null` here and set once at the start of Phase 3 (after plan confirmation) — this ensures idle wait time at the plan checkpoint is excluded from the budget. It is not reset on resume. Full enforcement semantics live in T7 Step 3.4 (budget gate at lens-loop top) and T10 (Moderator own-context soft budget).
 
 ### End of Phase 1
 
@@ -676,6 +677,8 @@ Concurrent novelty-check: running in background
 Proceed? [Y/n/edit]
 ```
 
+If `invocation.human_checkpoint == false`: skip the prompt entirely — auto-proceed as if user answered `Y`. Print `[checkpoint skipped — --no-checkpoint active]` to chat and continue to Phase 3.
+
 - If user answers `Y` or empty: save plan to state.json, continue to Phase 3.
 - If `n`: abort the run cleanly. Delete the disposable notebook. Do NOT save state.json.
 - If `edit`: enter edit loop (see Step 2.11).
@@ -715,6 +718,12 @@ State.json now contains:
 
 No subagent handles are persisted; the Phase 2a classification call was one-shot, and Phase 3 spawns fresh Reviewer and Author subagents per round (see §Architecture Amendment).
 ## Phase 3 — Adversarial debate loop
+
+### Phase 3 start: Capture wall_clock_start
+
+If `state.wall_clock_start` is `null`: set `state.wall_clock_start = now_iso()` and persist to `state.json`. This is the moment from which `wall_clock_budget_s` is measured — idle time at the Phase 2 plan confirmation prompt is intentionally excluded.
+
+On resume: `wall_clock_start` is already set and is not reset. The budget continues counting from the original start time.
 
 ### Step 3.1: First novelty-check collection point (non-blocking)
 
@@ -1358,7 +1367,7 @@ Worst-case spawn count for a depth-N run is ~9 lenses × (1 initial + 1 Author +
 |-------|---------|
 | `spawn_count` | Incremented by **1 on every `Agent(...)` call** across all phases (classification spawn, novelty-check runner, every per-round Reviewer and Author spawn). |
 | `spawn_budget` | Hard ceiling. Default `80` (≈25% headroom over the ~65-spawn worst case). Configurable per-run by an eventual `--spawn-budget` arg (out of scope for v1). |
-| `wall_clock_start` | ISO 8601 timestamp captured once when Phase 0 begins. Not reset on resume — a resumed run continues counting against the original budget unless the user opts to reset. |
+| `wall_clock_start` | ISO 8601 timestamp set once at the start of Phase 3 (after plan confirmation), ensuring idle wait at the plan checkpoint is excluded from the budget. Not reset on resume — a resumed run continues counting against the original budget. |
 | `wall_clock_budget_s` | Default `1800` seconds = 30 minutes. |
 | `abort_reason` | `null` for healthy runs. Set to one of `spawn_budget_exceeded`, `wall_clock_exceeded`, `moderator_context_exceeded`, or `fatal_error` on abort. |
 | `moderator_own_context_est_chars` | Running estimate of cumulative characters Main Claude has ingested from `Agent` tool results (one contribution per spawn). See Step 3.7.5. |
