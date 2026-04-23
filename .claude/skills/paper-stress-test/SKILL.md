@@ -287,7 +287,119 @@ By the end of Phase 0, the Moderator has:
 - Output directories created
 - User confirmation that this is a fresh run (or a resumption starting from Phase 3)
 - Parsed flags: `depth`, `type_override`, `cross_check_override`, `skip_novelty`
-<!-- Phase 1 instructions added in Task 3 -->
+## Phase 1 — NotebookLM setup
+
+### Step 1.1: Create disposable notebook
+
+Call:
+
+```
+mcp__notebooklm__notebook_create(
+  title: "${DISPOSABLE_NOTEBOOK_NAME_PREFIX}${FULL_SLUG}"
+)
+```
+
+The tool returns `notebook_id`. Save to the in-memory state object as `notebooks.disposable.id`.
+
+If the call errors, retry once after 5s. On second failure, abort with:
+
+> NotebookLM create failed twice. Is the MCP server reachable? Try `nlm login` first.
+
+### Step 1.2: Upload the paper
+
+```
+mcp__notebooklm__source_add(
+  notebook_id: <disposable_id>,
+  source_type: "file",
+  file_path: <validated_local_pdf_path>
+)
+```
+
+Verify the return value does not indicate a failure. On failure, retry once; on second failure, delete the just-created disposable notebook and abort.
+
+### Step 1.3: Resolve thematic cross-check notebook
+
+Decision tree:
+
+1. If `--cross-check <name>` was provided:
+   - Call `mcp__notebooklm__notebook_list()` and find the notebook whose name or ID matches. Save `notebooks.thematic.id` and `notebooks.thematic.name`.
+   - If no match: error out (malformed argument).
+
+2. If no `--cross-check` flag:
+   - Extract keywords from the paper's abstract (Read page 1 of the PDF, identify abstract block).
+   - Case-insensitive match keywords against the "Known thematic notebooks" table above.
+   - If exactly one notebook matches: auto-select, print "Auto-selected thematic notebook: <name> (keywords: survival, recurrent event)".
+   - If multiple or none match: prompt user:
+     > No single thematic notebook auto-selected. Choose:
+     >   [1] ML for Recurrent Events
+     >   [2] Interpretable AI
+     >   [3] Machine Learning Fundamentals
+     >   [4] Survival Analysis Fundamentals
+     >   [5] Skip cross-check (Lens 7 will fall back to disposable-only, and promote option is disabled)
+
+3. If user chose `[5]`: set `notebooks.thematic = null`, continue. Phase 6 promote option will be hidden.
+
+### Step 1.4: Initialize state.json
+
+Write `${OUT_ROOT}/state/${FULL_SLUG}_state.json` with:
+
+```json
+{
+  "schema_version": "1",
+  "paper": {
+    "title": "<extracted from PDF page 1>",
+    "authors": ["<first author>", "..."],
+    "year": <year>,
+    "source": "<original paper-ref argument>",
+    "slug": "${FULL_SLUG}"
+  },
+  "invocation": {
+    "depth": <parsed>,
+    "type_override": <parsed or null>,
+    "cross_check_override": <parsed or null>,
+    "skip_novelty": <parsed boolean>
+  },
+  "notebooks": {
+    "disposable": {
+      "id": "<id>",
+      "name": "${DISPOSABLE_NOTEBOOK_NAME_PREFIX}${FULL_SLUG}",
+      "created_at": "<ISO 8601>",
+      "disposition": "pending",
+      "promoted_to": null
+    },
+    "thematic": {
+      "id": "<id or null>",
+      "name": "<name or null>"
+    }
+  },
+  "detected_type": null,
+  "headline_claim": null,
+  "novelty_check": null,
+  "lens_plan": [],
+  "lenses_completed": [],
+  "synthesis": null,
+  "transcript": [],
+  "moderator_assessments": [],
+  "compaction_history": [],
+  "spawn_count": 0,
+  "spawn_budget": 80,
+  "wall_clock_start": "<ISO 8601 — set exactly once when Phase 0 begins>",
+  "wall_clock_budget_s": 1800,
+  "abort_reason": null,
+  "moderator_own_context_est_chars": 0,
+  "run_status": "in_progress",
+  "started_at": "<ISO 8601>",
+  "completed_at": null
+}
+```
+
+**Schema note (amended 2026-04-22):** The fields `reviewer_subagent`, `author_subagent`, and `reseed_history` that appeared in pre-amendment drafts are **removed**. Under the transcript-relay architecture there are no persistent subagent handles; `transcript` is the full turn-by-turn record (array of reviewer/author/moderator records per §Architecture Amendment), `moderator_assessments` is a flat index of the per-round Moderator entries for Phase 4 synthesis, and `compaction_history` replaces the old reseed-history field.
+
+**Run-budget fields** (`spawn_count`, `spawn_budget`, `wall_clock_start`, `wall_clock_budget_s`, `abort_reason`, `moderator_own_context_est_chars`) are declared and documented in T11 Step 3.8.5; `wall_clock_start` is captured once here in Phase 0 and is not reset on resume. Full enforcement semantics live in T7 Step 3.4 (budget gate at lens-loop top) and T10 (Moderator own-context soft budget).
+
+### End of Phase 1
+
+By the end of Phase 1, the Moderator has a populated state file with notebook IDs and paper metadata. Nothing has been queried yet.
 <!-- Phase 2 instructions added in Tasks 4, 5, 6 -->
 <!-- Phase 3 instructions added in Tasks 7, 8, 9, 10, 11 -->
 <!-- Phase 4 instructions added in Task 12 -->
