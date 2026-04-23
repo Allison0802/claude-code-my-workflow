@@ -186,7 +186,107 @@ These are required: `Agent` spawns fresh Reviewer and Author subagents synchrono
 
 Follow the phase-by-phase instructions below. Phases 2 through 6 depend on state persisted after each lens, so Phase 3 must be resumable from `state.json`.
 
-<!-- Phase 0 instructions added in Task 2 -->
+## Phase 0 — Input resolution and prior-test detection
+
+Parse `$ARGUMENTS` into `<paper-ref>` + flags. Supported `<paper-ref>` forms:
+
+| Form | Detection rule | Resolution |
+|------|----------------|-----------|
+| Local absolute path | starts with `/` and ends in `.pdf` | verify exists with `test -f`; if not, abort |
+| Local relative path | not absolute but contains `.pdf` | resolve against CWD; verify exists |
+| `supporting_papers/` filename | bare filename present in `master_supporting_docs/supporting_papers/` | resolve full path |
+| arXiv ID | matches `^[0-9]{4}\.[0-9]{4,5}(v[0-9]+)?$` | download to `/tmp/arxiv-<id>.pdf` |
+| URL | starts with `http://` or `https://` | `curl -L -o /tmp/paper-<timestamp>.pdf <url>` |
+
+arXiv download command:
+
+```bash
+ARXIV_ID="2401.12345"  # substituted at runtime
+curl -sL -o "/tmp/arxiv-${ARXIV_ID}.pdf" "https://arxiv.org/pdf/${ARXIV_ID}.pdf"
+test -s "/tmp/arxiv-${ARXIV_ID}.pdf" || { echo "arXiv download failed"; exit 1; }
+```
+
+If download fails, retry once after 5s sleep; on second failure, abort with a clear error.
+
+### Slug generation
+
+Slug format: `<firstauthor>_<year>_<shorttitle>_<YYYY-MM-DD>`.
+
+1. Use the `Read` tool on pages 1-2 of the PDF (pass `pages: "1-2"`).
+2. From the rendered text, extract:
+   - First author's last name (lowercase, ASCII-only — strip diacritics; drop suffixes like "Jr.")
+   - Publication year (4-digit, usually in copyright line or header)
+   - Short title: lowercase the title, strip punctuation, take the first two content words (skip articles: "the", "a", "an", "on", "of", "in", "for")
+3. Today's date: `date +%Y-%m-%d`
+4. Assemble: `${author}_${year}_${title1}_${title2}_${date}` (3 words total + date — use underscore if only 1 title content word).
+
+Examples:
+- "Kalbfleisch & Prentice (2002), *The Statistical Analysis of Failure Time Data*" → `kalbfleisch_2002_statistical_analysis_2026-04-22`
+- "Zhang et al. (2024), *Deep Survival Forests for Competing Risks*" → `zhang_2024_deep_survival_2026-04-22`
+
+### Output directory creation
+
+```bash
+OUT_ROOT="/Users/alison/Library/CloudStorage/OneDrive-UniversityofNorthCarolinaatChapelHill/Research/master_supporting_docs/supporting_papers/stress_tests"
+mkdir -p "${OUT_ROOT}/briefing" "${OUT_ROOT}/transcripts" "${OUT_ROOT}/state"
+```
+
+### Prior-test detection
+
+The slug prefix (everything before the date) identifies this paper across runs. Glob for prior briefings:
+
+```bash
+SLUG_PREFIX="kalbfleisch_2002_statistical_analysis"   # derived above
+ls "${OUT_ROOT}/briefing/${SLUG_PREFIX}"*_briefing.md 2>/dev/null
+```
+
+For each prior briefing file, parse its "Severity summary table" to count `critical` and `major` rows. A simple grep suffices:
+
+```bash
+for f in "${OUT_ROOT}/briefing/${SLUG_PREFIX}"*_briefing.md; do
+  [ -f "$f" ] || continue
+  CRIT=$(grep -c '| critical |' "$f" 2>/dev/null || echo 0)
+  MAJ=$(grep -c '| major |' "$f" 2>/dev/null || echo 0)
+  echo "$(basename "$f"): critical=${CRIT}, major=${MAJ}"
+done
+```
+
+If prior hits exist, print them to the user and prompt:
+
+> Prior stress-tests of this paper:
+>   - kalbfleisch_2002_statistical_analysis_2026-03-14_briefing.md (critical: 2, major: 3)
+>   - kalbfleisch_2002_statistical_analysis_2026-01-08_briefing.md (critical: 0, major: 1)
+>
+> Continue with new stress-test? [Y/n]
+
+If user answers `n`, abort cleanly (no notebook created, no state written).
+
+### Resume detection
+
+If `${OUT_ROOT}/state/${FULL_SLUG}_state.json` already exists for today's full slug, the skill is being re-invoked on the same paper-same-date. Prompt:
+
+> A stress-test with today's slug is already in progress or completed:
+>   ${FULL_SLUG}_state.json (run_status: in_progress)
+>
+> Choose:
+>   [R] Resume from last completed lens
+>   [S] Start fresh (overwrites state file; previous briefing left intact)
+>   [A] Abort
+
+If `R`: load state.json, jump directly to Phase 3 with `lenses_completed` already populated. Skip Phases 0.5, 1, 2 — reuse the persisted notebook IDs and plan.
+
+If `S`: delete the state file, restart Phase 0 fresh (but the user already confirmed the prior-test prompt, so just proceed).
+
+If `A`: exit.
+
+### End of Phase 0
+
+By the end of Phase 0, the Moderator has:
+- A validated local PDF path
+- A full slug
+- Output directories created
+- User confirmation that this is a fresh run (or a resumption starting from Phase 3)
+- Parsed flags: `depth`, `type_override`, `cross_check_override`, `skip_novelty`
 <!-- Phase 1 instructions added in Task 3 -->
 <!-- Phase 2 instructions added in Tasks 4, 5, 6 -->
 <!-- Phase 3 instructions added in Tasks 7, 8, 9, 10, 11 -->
