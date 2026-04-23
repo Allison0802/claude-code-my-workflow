@@ -400,7 +400,320 @@ Write `${OUT_ROOT}/state/${FULL_SLUG}_state.json` with:
 ### End of Phase 1
 
 By the end of Phase 1, the Moderator has a populated state file with notebook IDs and paper metadata. Nothing has been queried yet.
-<!-- Phase 2 instructions added in Tasks 4, 5, 6 -->
+## Phase 2 — Reviewer spawn, classification, novelty-check, plan confirmation
+
+Phase 2 has three sub-phases that run concurrently where possible:
+- **2a:** Spawn Reviewer; Reviewer classifies the paper + extracts headline + lists novelty claims.
+- **2b:** Moderator fires `novelty-check` sub-call (running in the background via `Skill` tool).
+- **2c:** Moderator builds the lens plan from the weight matrix and prompts user to confirm.
+
+### Step 2.1: Load reviewer prompt template
+
+Read `.claude/skills/paper-stress-test/agents/reviewer.md` with the `Read` tool. Store its contents as `REVIEWER_PROMPT`.
+
+### Step 2.2: One-shot Reviewer classification spawn
+
+**Amended 2026-04-22:** Phase 2a's Reviewer spawn is now a single synchronous `Agent` call whose tool result IS the classification. No `agent_id` is persisted; no follow-up is sent. The persona is re-spawned fresh per round during Phase 3 (see Tasks 8 and 9).
+
+Call `Agent` with:
+
+```
+classification_text = Agent(
+  description:       "paper-stress-test classification",
+  subagent_type:     "general-purpose",
+  model:             "opus",
+  run_in_background: False,
+  prompt: REVIEWER_PROMPT
+    .replace("{{PAPER_TITLE}}", state.paper.title)
+    .replace("{{PAPER_AUTHORS}}", state.paper.authors.join(", "))
+    .replace("{{PAPER_YEAR}}", state.paper.year)
+    .replace("{{DISPOSABLE_NOTEBOOK_ID}}", state.notebooks.disposable.id)
+    .replace("{{THEMATIC_NOTEBOOK_ID}}", state.notebooks.thematic.id ?? "null")
+    .replace("{{LENS_ID}}", "n/a — classification only")
+    .replace("{{LENS_NAME}}", "classification")
+    .replace("{{LENS_DESCRIPTION}}", "one-shot paper-type classification before the lens loop")
+    .replace("{{LENS_DEPTH}}", "0")
+    .replace("{{ROUND}}", "0")
+    .replace("{{REQUIRED_OUTPUT}}", "classification + headline + novelty claims (see prompt below)")
+    .replace("{{MODERATOR_STEER_BLOCK}}", "")
+    .replace("{{TRANSCRIPT_BLOCK}}", "(no transcript yet — this is the pre-debate classification pass)")
+    + "\n\n## This spawn: paper classification (one-shot, synchronous)\n\nQuery the disposable notebook (ID: " + state.notebooks.disposable.id + ") three times via mcp__notebooklm__notebook_query:\n\n1. 'Classify this paper as exactly one of: predictive-ML, new-estimator, applied-empirical, causal-inference, review-survey. Return the label plus one sentence of justification, nothing else.'\n2. 'State the paper's headline contribution in one sentence, quoting the exact wording from abstract or conclusion.'\n3. 'List the 3 to 5 most important technical claims the paper positions as novel. Format as a numbered list; be specific, avoid generic phrasing like 'novel approach'.'\n\nReturn all three answers concatenated, one per paragraph, with clear headings. Do NOT query anything else. You will NOT be called again in this spawn — treat this as a single-turn task."
+)
+```
+
+The returned `classification_text` string is the entire output for this spawn. Proceed to Step 2.3 to parse it. No subagent handle is retained.
+
+If `type_override` was specified: skip query 1 and use the override; the prompt instructs the subagent to run only queries 2 and 3.
+
+### Step 2.3: Parse Reviewer's classification response
+
+The Reviewer returns text like:
+
+```
+## Classification
+new-estimator — the paper proposes a new pseudo-observation-based estimator for competing risks.
+
+## Headline contribution
+"We introduce a jackknife pseudo-observation estimator for cumulative incidence that is consistent under independent censoring."
+
+## Novelty claims
+1. First pseudo-observation formulation for this estimand.
+2. Jackknife variance estimator with proof of asymptotic normality.
+3. Simulation showing 20% efficiency gain over Aalen-Johansen.
+```
+
+**Parsing:** use **Parsing contract §6 (Classification triple-query response)** from SKILL.md. Extract `detected_type`, `headline_claim`, `novelty_claims[]`. On mismatch, run the Reparse protocol once; if still mismatch, hand off to Step 2.4 validation (below).
+
+Write all three fields into state.json.
+
+### Step 2.4: Validate detected_type — no silent defaults
+
+`detected_type` MUST be exactly one of: `predictive-ML`, `new-estimator`, `applied-empirical`, `causal-inference`, `review-survey`.
+
+**Never silently default.** The weight matrix is deliberately asymmetric — misrouting a causal-inference-new-estimator paper to `applied-empirical` skips Lens 1 (estimand) and downweights Lens 2 (identification), which is exactly the wrong thing for the papers we care most about.
+
+Validation flow:
+
+1. If the Reviewer's first attempt returned a label matching the enum exactly → accept.
+2. If the label is ambiguous (e.g., `causal-inference / new-estimator`, `predictive-ML with causal elements`) or not in the enum → reprompt the Reviewer **once** with:
+
+   > Your classification must be EXACTLY one label from: predictive-ML, new-estimator, applied-empirical, causal-inference, review-survey. If the paper spans two types, pick the one most central to the headline contribution, and include your reasoning for the tradeoff.
+
+3. If the reprompt still returns something ambiguous or off-enum → STOP and hand to the user. Print:
+
+   > I couldn't confidently classify this paper. The Reviewer's responses were:
+   >
+   > Attempt 1: `<response>`
+   > Attempt 2: `<response>`
+   >
+   > Please pick one:
+   >   [1] predictive-ML
+   >   [2] new-estimator
+   >   [3] applied-empirical
+   >   [4] causal-inference
+   >   [5] review-survey
+
+4. Wait for user input. Record `state.detected_type = <user-chosen>` and `state.classification_source = "user_override"` (otherwise `"reviewer"`).
+
+5. If the paper is classification-plausible as multiple types (Reviewer mentioned two), ALSO surface the ambiguity at Step 2.10's plan confirmation with a warning line:
+
+   > ⚠️ Classification was ambiguous between `<type_A>` and `<type_B>`. Current plan uses `<detected_type>`. You can change it via the `[T]` option in edit mode.
+
+This is the only point in the skill where a malformed-output path waits synchronously on the user. It is deliberate — a wrong type invalidates the whole stress-test.
+
+### Step 2.5: Fire novelty-check sub-call as a background Agent (not foreground Skill)
+
+**Why not the `Skill` tool directly:** `Skill` blocks in the foreground. There is no way to enforce a timeout on a foreground call — once dispatched it must return on its own schedule. The only way to get an enforceable timeout is to route the call through a **background Agent** that we can abandon.
+
+If `invocation.skip_novelty` is true, skip this entire subsection and set `state.novelty_check = {"status": "skipped", "started_at": null, "completed_at": null, ...}`.
+
+Otherwise, assemble the novelty-check input string:
+
+```
+input_for_novelty = [
+  "Stress-test context — verify whether this paper's headline claim is genuinely novel.",
+  "",
+  "Paper: " + state.paper.authors.join(", ") + " (" + state.paper.year + "). " + state.paper.title,
+  "",
+  "Headline claim: " + state.headline_claim,
+  "",
+  "Core novelty claims:"
+] + state.novelty_claims.map(c => "- " + c) + [
+  "",
+  "Return the standard novelty-check Phase D report verbatim."
+]
+```
+
+Spawn a background runner Agent:
+
+```
+Agent(
+  description: "novelty-check runner for paper-stress-test",
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  run_in_background: true,
+  prompt: "Invoke the `novelty-check` skill with the following input, then return the skill's complete output markdown report. Do nothing else.\n\n---\n\n" + input_for_novelty.join("\n")
+)
+```
+
+Record:
+
+```json
+"novelty_check": {
+  "status": "running",
+  "runner_agent_id": "<returned id>",
+  "started_at": "<ISO now>",
+  "completed_at": null
+}
+```
+
+Because `run_in_background: true`, the call returns immediately. The runner Agent proceeds asynchronously; the Moderator continues to Phase 2c (plan confirmation) while the runner is still working. When the runner finishes, the harness notifies the Moderator automatically (per the Agent tool docs: "you will be automatically notified when it completes — do NOT sleep, poll, or proactively check on its progress").
+
+### Step 2.6: Collect the novelty-check result (lazy / at point of use; parse per Parsing contract §7)
+
+Rule: do NOT actively poll the runner agent. Instead, check for a completion notification at two fixed points:
+
+1. **At the start of Phase 3** (just before spawning the Author). If the notification has arrived, parse the result.
+2. **At the start of Lens 7** (just before building the novelty-seed message). If still not available, make a final check.
+
+Between these two points, if the runner has notified completion, the Moderator should recognize that from the conversation context (the notification is surfaced as a system message).
+
+When the runner's output arrives:
+- Parse the fields per the **Parsing contract** (novelty-check section) — see dedicated section in SKILL.md.
+- Populate `state.novelty_check.status = "completed"`, `completed_at = now`, `overall_score`, `recommendation`, `key_differentiator`, `closest_prior_work[]`, `raw_report_md`.
+
+### Step 2.7: Enforce the timeout
+
+At each of the two check points above, compute `elapsed = now - state.novelty_check.started_at`.
+
+- If the runner has completed: use it (regardless of elapsed).
+- If NOT completed and `elapsed > NOVELTY_CHECK_TIMEOUT_SECONDS` (300): mark `status = "timed_out"`, `completed_at = now`, leave `raw_report_md = null`. **Do not attempt to kill the runner** — there is no reliable kill; it will complete eventually and its late result is ignored. The runner's notification message, if it arrives later, is treated as informational only (the stress-test has moved on).
+- If NOT completed and `elapsed <= 300`: status stays `"running"`. Lens 7 will degrade to two-source mode (or single-source); the final briefing will note novelty as "pending/not received in time."
+
+This gives a truly enforceable ceiling because the Moderator never waits — it checks, proceeds, and moves on. Wall-clock elapsed is what bounds the wait, not any polling loop.
+
+### Step 2.8: Handle runner-agent failure
+
+If the runner Agent errored on spawn (rare; usually a tool-availability issue): set `status = "errored"`, record the error message in `raw_report_md`, continue.
+
+If the runner completed but its output doesn't match the expected novelty-check format (e.g., skill errored internally and returned a diagnostic instead): set `status = "errored"`, keep the runner's raw text in `raw_report_md` for debugging, continue.
+
+In all three non-completed cases (`errored`, `timed_out`, `running` → then treated as `timed_out` at Lens 7), Lens 7 falls back per the degradation table in Task 9.
+
+Parsing of the runner's output uses the canonical regexes in the **Parsing contract** section of SKILL.md (see the new Parsing Contract task earlier in this plan). The novelty-check fields are:
+
+```json
+"novelty_check": {
+  "status": "completed | errored | timed_out | skipped | running",
+  "runner_agent_id": "...",
+  "started_at": "...",
+  "completed_at": "...",
+  "overall_score": 6,
+  "recommendation": "PROCEED | PROCEED WITH CAUTION | ABANDON",
+  "key_differentiator": "...",
+  "closest_prior_work": [
+    {"paper": "Zhang et al. 2024", "year": 2024, "venue": "NeurIPS",
+     "overlap": "...", "key_difference": "..."}
+  ],
+  "raw_report_md": "<full markdown>"
+}
+```
+
+If any individual field fails to parse, leave it `null` and keep `raw_report_md` intact — the briefing can still embed the raw report.
+
+### Step 2.9: Build the lens plan from the weight matrix
+
+Lens metadata table (hard-coded in this skill):
+
+| # | name | description |
+|---|------|-------------|
+| 0 | data | Data structure & characteristics |
+| 1 | estimand | Estimand clarity |
+| 2 | identification | Identification assumptions |
+| 3 | methodology | Statistical methodology |
+| 4 | overclaims | Overclaims vs. evidence |
+| 5 | alternatives | Alternative explanations |
+| 6 | generalizability | Generalizability |
+| 7 | positioning | Positioning vs. prior work (triangulation) |
+| 8 | reproducibility | Reproducibility |
+
+Weight matrix (rows = lenses, columns = paper types, values = weight label):
+
+| Lens | predictive-ML | new-estimator | applied-empirical | causal-inference | review-survey |
+|------|---------------|---------------|-------------------|------------------|---------------|
+| 0 | heavy | medium | heavy | medium | skip |
+| 1 | light | heavy | medium | heavy | skip |
+| 2 | skip | medium | medium | heavy | skip |
+| 3 | medium | heavy | medium | heavy | light |
+| 4 | heavy | medium | heavy | heavy | heavy |
+| 5 | medium | light | heavy | heavy | skip |
+| 6 | heavy | heavy | medium | medium | light |
+| 7 | heavy | heavy | medium | medium | heavy |
+| 8 | heavy | medium | medium | medium | skip |
+
+Weight → depth mapping given invocation depth `D`:
+
+```
+heavy  -> D
+medium -> max(1, D-1)
+light  -> 1
+skip   -> 0
+```
+
+Build `lens_plan[]` as an array of objects:
+
+```json
+[
+  {"lens_id": 0, "name": "data", "weight": "medium", "depth": 1},
+  {"lens_id": 1, "name": "estimand", "weight": "heavy", "depth": 2},
+  ...
+]
+```
+
+Skipped lenses are **included** in `lens_plan` with `depth: 0` so the user can see them during edit.
+
+### Step 2.10: Display the plan and prompt user
+
+Print to chat (adjust counts for actual values):
+
+```
+Paper-type-aware lens plan (depth=2, detected type=new-estimator)
+
+ # | Lens               | Weight  | Queries | Action
+ 0 | data               | medium  |    1    | RUN
+ 1 | estimand           | heavy   |    2    | RUN
+ 2 | identification     | medium  |    1    | RUN
+ 3 | methodology        | heavy   |    2    | RUN
+ 4 | overclaims         | medium  |    1    | RUN
+ 5 | alternatives       | light   |    1    | RUN
+ 6 | generalizability   | heavy   |    2    | RUN
+ 7 | positioning        | heavy   |    2    | RUN (triangulation)
+ 8 | reproducibility    | medium  |    1    | RUN
+
+Total active queries: ~13 (Reviewer + Author × depth)
+Concurrent novelty-check: running in background
+
+Proceed? [Y/n/edit]
+```
+
+- If user answers `Y` or empty: save plan to state.json, continue to Phase 3.
+- If `n`: abort the run cleanly. Delete the disposable notebook. Do NOT save state.json.
+- If `edit`: enter edit loop (see Step 2.11).
+
+### Step 2.11: Plan edit loop (type + lens weights)
+
+Prompt:
+
+> Edit what?
+>   [T] Change detected paper type (currently: `<detected_type>`)
+>   [0-8] Change weight of lens N
+>   [done] finish editing
+
+**On `T`:** Show Reviewer's full classification justification (from Step 2.3), then prompt:
+
+> Current: `<detected_type>` — `<reviewer justification>`
+>
+> Override with which type? [predictive-ML | new-estimator | applied-empirical | causal-inference | review-survey]
+
+User answer updates `state.detected_type` AND triggers a lens-plan rebuild (Step 2.9 rerun on the new type). Then return to the edit prompt.
+
+**On a lens number `N`:** show current weight and prompt:
+
+> Lens N is currently `<weight>` (depth=<depth>). New weight? [heavy | medium | light | skip]
+
+Update the single lens entry. Return to the edit prompt.
+
+**On `done`:** re-display the plan and return to the `Y/n/edit` prompt (Step 2.10).
+
+### End of Phase 2
+
+State.json now contains:
+- `detected_type`, `headline_claim`, `novelty_claims`
+- `novelty_check` block (possibly still `running`; moderator re-checks at Phase 3 start, no blocking)
+- `lens_plan` (confirmed by user)
+- Empty `transcript`, `moderator_assessments`, `compaction_history` — all populated during Phase 3.
+
+No subagent handles are persisted; the Phase 2a classification call was one-shot, and Phase 3 spawns fresh Reviewer and Author subagents per round (see §Architecture Amendment).
 <!-- Phase 3 instructions added in Tasks 7, 8, 9, 10, 11 -->
 <!-- Phase 4 instructions added in Task 12 -->
 <!-- Phase 5 instructions added in Task 13 -->
