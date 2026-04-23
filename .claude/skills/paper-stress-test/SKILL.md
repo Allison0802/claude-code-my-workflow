@@ -9,6 +9,31 @@ allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, mcp__notebooklm__n
 
 Adversarial single-paper interrogation: **$ARGUMENTS**
 
+## Arguments
+
+**Positional (required):**
+
+- `<paper-path-or-arxiv-id>` — The paper to stress-test. Accepts:
+  - Absolute path to a `.pdf`
+  - Relative path to a `.pdf` (resolved against CWD)
+  - Bare filename in `master_supporting_docs/supporting_papers/`
+  - arXiv ID matching `^[0-9]{4}\.[0-9]{4,5}(v[0-9]+)?$` (auto-downloaded to `/tmp/arxiv-<id>.pdf`)
+  - Full `http(s)://` URL to a PDF (auto-downloaded to `/tmp/paper-<timestamp>.pdf`)
+  - Resolution rules: Phase 0, "Input resolution" table.
+
+**Optional flags:**
+
+| Flag | Type | Default | Effect |
+|------|------|---------|--------|
+| `--depth N` | integer | 2 | Aggressiveness of the adversarial debate. Maps to per-lens rounds via the weight table: `heavy → N`, `medium → max(1, N-1)`, `light → 1`, `skip → 0`. Higher `N` = more Reviewer↔Author exchanges per lens (and ~linear growth in total `Agent` spawns). |
+| `--type T` | enum | auto-detected | Override the Reviewer's paper-type classification. One of: `predictive-ML`, `new-estimator`, `applied-empirical`, `causal-inference`, `review-survey`. Paper type drives per-lens weights (see Step 2.9 table), so this re-shapes the lens plan. |
+| `--cross-check NB` | string | auto-suggest | Pin the thematic cross-check notebook used by Lens 7 (positioning/triangulation). Matches against notebook name or ID from the "Known thematic notebooks" table. If omitted, keywords from the paper's abstract are matched against the same table; ambiguous matches prompt the user. |
+| `--skip-novelty` | boolean | false | Do not spawn the concurrent `novelty-check` sub-call in Phase 2 (see Step 2.5). Saves tokens when the prior-art landscape is already known; the briefing's novelty section will show `status: skipped`. |
+| `--no-checkpoint` | boolean | false | Skip the Phase 2 human-in-the-loop plan-confirmation prompt; auto-proceed as if the user answered `Y` (Step 2.10). Useful for unattended runs. |
+| `--resume <slug>` | string | — | Resume an aborted or interrupted run from its saved `state.json`. `<slug>` is the `<firstauthor>_<year>_<shorttitle>_<YYYY-MM-DD>` identifier printed when the run started. Re-uses the existing disposable notebook, lens plan, and completed-lens records; restarts at the next incomplete lens in Phase 3. |
+
+All parsed flag values are persisted under `state.invocation` (Step 1.4); the runtime constants block below (`REVIEWER_MODEL`, `AUTHOR_MODEL`, `COMPACTION_THRESHOLD_CHARS`, `NOVELTY_CHECK_TIMEOUT_SECONDS`, etc.) is **not** runtime-configurable — edit SKILL.md to change those.
+
 ## Overview
 
 This skill uploads a paper to a disposable NotebookLM notebook, then runs a structured adversarial debate across nine lenses weighted by detected paper type. Each round of each lens spawns a fresh Opus Reviewer (hostile Biostatistics referee) and a fresh Sonnet Author-surrogate (defends the paper using only paper-internal evidence retrieved via NotebookLM); the Moderator holds the running transcript and writes a read-reasoning-and-decision entry after every (Reviewer, Author) exchange, which steers the next round. A concurrent sub-call to the `novelty-check` skill provides external novelty verification. The output is a structured briefing with per-lens severity, top-5 killer questions, sub-project relevance, and a cite/build-on/flag/skip recommendation.
