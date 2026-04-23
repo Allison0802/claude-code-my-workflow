@@ -13,7 +13,7 @@
 
 ## TL;DR verdict
 
-{{TLDR_VERDICT}}
+{{VERDICT}}
 
 ---
 

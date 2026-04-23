@@ -15,6 +15,20 @@ This skill uploads a paper to a disposable NotebookLM notebook, then runs a stru
 
 Spec reference: `quality_reports/specs/2026-04-22_paper-stress-test-design.md`.
 
+> ### ⚠ Hollow-run red flags
+>
+> If **ANY** of these is true after Phase 3 completes, the skill has failed silently — do NOT proceed to Phase 4:
+>
+> - `state.transcript` is still `[]` after a lens has been marked complete.
+> - `state.spawn_count` is still `0` after Phase 2a classification (classification itself spawns a Reviewer).
+> - `len(state.moderator_assessments)` grows slower than `len(state.lenses_completed)`.
+> - Any record in `state.lenses_completed` contains only `{lens_id, name, severity}` — the six content fields (`one_line_finding`, `evidence`, `author_best_defense`, `why_it_didnt_hold`, `summary_for_compaction`, `transcript_slice`) are absent or empty.
+> - You wrote the Phase 5 briefing before all active lens debates finished.
+> - `state.synthesis.recommendation` is anything other than `"cite" | "build-on" | "flag" | "skip"`.
+> - `state.notebooks.disposable.disposition` is `null` or `"pending"` when `state.run_status` is `"completed"`.
+>
+> **Each gate below (G-3a, G-3b, G-3c, G-4a, G-5a) enforces one of these invariants.** A hollow run is a silent spec violation, not an alternative completion path. The post-hoc validator at `scripts/validate_state.py` re-checks the same invariants for audit.
+
 ## Workflow
 
 Seven phases (0–6):
@@ -28,6 +42,8 @@ Seven phases (0–6):
 | 4 | Synthesis (top-5 questions, sub-project relevance, recommendation) |
 | 5 | Write briefing + transcripts + state files |
 | 6 | Cleanup with optional promote-to-thematic |
+
+> **Section references.** `T<N>` citations in this document are historical task IDs from the v1 implementation plan; they co-refer to the phase/step cited on the same line (e.g., "T11 Step 3.8.5" and "Step 3.8.5" are the same location). In new text, cite phase.step only — `T`-numbers are kept where they already appear for diff minimalism.
 
 ## Constants
 
@@ -719,6 +735,15 @@ State.json now contains:
 No subagent handles are persisted; the Phase 2a classification call was one-shot, and Phase 3 spawns fresh Reviewer and Author subagents per round (see §Architecture Amendment).
 ## Phase 3 — Adversarial debate loop
 
+> **Anti-rationalization table — do NOT take these shortcuts.** Hollow runs (all lenses "completed" with empty state) arise when Moderator substitutes these framings for the actual debate loop. Each one is a spec violation.
+>
+> | Rationalization | Why it's wrong |
+> |---|---|
+> | "I can infer severity from Phase 2a classification output; no Reviewer spawn needed." | Severity must come from a Reviewer JUDGMENT emitted in an Agent spawn, per **Parsing contract §2** and Step 3.8 step 1. Classification in Phase 2a produces only `detected_type`, `headline_claim`, `novelty_claims` — not per-lens severities. |
+> | "I'll write the briefing first, then backfill state.json at the end." | `state.json` is the source of truth and MUST be persisted per-lens (Step 3.8 step 4, atomic `.tmp` + `mv`). The briefing is DERIVED from state.json in Phase 5, never vice-versa. |
+> | "The transcript belongs in `transcripts/*.md`, not in `state.transcript`." | Both. `state.transcript` is the machine-readable truth used by compaction (Step 3.7), resume (Resumability), and validator (Self-check). `transcripts/*.md` is a human-readable render produced in Step 5.2 from `state.lenses_completed[*].transcript_slice`. |
+> | "The briefing is the deliverable; state.json is bookkeeping." | state.json is the deliverable. Partial-mode briefing (Step 5.1) reads from state.json when Phase 4 never ran; if state.json is hollow, partial-mode produces garbage. |
+
 ### Phase 3 start: Capture wall_clock_start
 
 If `state.wall_clock_start` is `null`: set `state.wall_clock_start = now_iso()` and persist to `state.json`. This is the moment from which `wall_clock_budget_s` is measured — idle time at the Phase 2 plan confirmation prompt is intentionally excluded.
@@ -799,6 +824,7 @@ Pseudocode:
 # Outer lens loop (runs once per run)
 for lens in [l for l in state.lens_plan if l.depth > 0]:
     check_budgets_before_lens(lens)                           # T11 Step 3.8.5 — may abort_run()
+    assert_hollow_run_invariants(state, lens)                 # Step 3.4.5 — GATE G-3a; may abort_run()
     running_ctx = maybe_compact(state.transcript)             # Task 10
     if lens.lens_id == 7:
         exchange = run_lens_7(lens, running_ctx)              # Task 9 — uses spawn_agent
@@ -808,6 +834,24 @@ for lens in [l for l in state.lens_plan if l.depth > 0]:
 ```
 
 `check_budgets_before_lens` is the single enforcement point for the three hard-ceiling conditions (`spawn_budget`, `wall_clock_budget_s`, `MODERATOR_OWN_CONTEXT_SOFT_LIMIT_CHARS`). The per-round loops and the Moderator read/reasoning/decision logic live inside `run_standard_lens` (Task 8) and `run_lens_7` (Task 9). This task defines only the outer lens-iteration skeleton and the shared data structures.
+
+### Step 3.4.5: GATE G-3a — pre-lens hollow-run invariants
+
+`assert_hollow_run_invariants(state, lens)` runs immediately after `check_budgets_before_lens` at the top of each iteration. It catches hollow runs at the next lens boundary — the moment Moderator attempts to advance without having actually debated the prior lens.
+
+Predicate (all must hold; any `False` → `abort_run("hollow_run_detected", detail=<which>)`):
+
+1. `state.wall_clock_start is not None` — Phase 3 start was reached.
+2. For every `prior ∈ state.lenses_completed`:
+   - `prior.transcript_slice` has `length >= 3` (Reviewer initial + Author answer + terminal Reviewer at minimum).
+   - `prior.one_line_finding`, `prior.author_best_defense`, `prior.summary_for_compaction` are all non-empty strings (not `None`, not `""`, not `"not provided"` when severity ≠ `"errored"`).
+3. If `lens.lens_id != 0` (i.e., this is not the first lens):
+   - `state.spawn_count >= 1` — Phase 2a classification alone should have produced at least one spawn.
+   - `len(state.moderator_assessments) >= len(state.lenses_completed)` — every completed lens must have contributed at least one moderator assessment entry per round.
+
+Abort behavior identical to Step 3.8.5's `abort_run`: writes partial briefing via Phase 5 with `partial=True`, persists `state.json`, terminates without Phase 4. The abort message names the exact invariant that failed so the user can diagnose which earlier lens was hollow. Resume via `--resume <slug>` rebuilds `running_ctx` and retries the offending lens.
+
+**Rationale.** G-3a exists because the Moderator reading the skill may be tempted to advance to the next lens after writing a scaffold record — this gate makes that impossible. It fires at the latest one lens after the hollow behavior occurs.
 
 ### Step 3.5: Standard lens debate (all lenses except 7)
 
@@ -1312,7 +1356,9 @@ For each completed `LensExchange` returned by Task 8 or 9:
    conceded  -> critical
    ```
 
-3. **Compose the lens record:**
+3. **Compose the lens record.**
+
+   > **⚠ MANDATORY FIELDS — copy this structure literally.** Nine keys are required; do NOT omit any. If content is truly absent, write an explicit `null` (for conditional keys) or `"not provided"` (for evidence when the Author said so) — an ABSENT KEY is a spec violation that GATE G-3b (step 6 below) will catch. `why_it_didnt_hold` is the only conditionally-omitted key (present only when `severity != "clean"`).
 
    ```json
    {
@@ -1344,6 +1390,16 @@ For each completed `LensExchange` returned by Task 8 or 9:
 5. **User-visible progress message:**
 
    > Lens <N> (<name>) complete — severity: <severity>
+
+6. **GATE G-3b — per-lens record validation.** Immediately after the atomic state write in step 4 (and before emitting the progress message in step 5), verify the just-appended record. All must hold:
+
+   - All nine required keys are present: `lens_id`, `name`, `severity`, `one_line_finding`, `evidence`, `author_best_defense`, `summary_for_compaction`, `moderator_signals`, `transcript_slice`. Plus `why_it_didnt_hold` when `severity != "clean"`.
+   - `severity ∈ {"critical", "major", "minor", "clean", "errored"}`.
+   - `transcript_slice` is a list with `length >= 3` (Reviewer initial + Author answer + terminal Reviewer at minimum; standard lenses typically have 4–6 entries, Lens 7 has 3 minimum).
+   - `one_line_finding`, `author_best_defense`, `summary_for_compaction` are non-empty strings (not `None`, not `""`).
+   - `moderator_signals` is a non-empty list.
+
+   If any check fails → `abort_run("lens_record_incomplete", detail=f"lens {lens_id} {name}: <which field>")`. The atomic write in step 4 means the bad record is already on disk; the partial briefing (Phase 5 with `partial=True`) will render what's there, and the abort message tells the user which lens to re-run via `--resume`.
 
 ### Step 3.8.5: Run budget and abort fields
 
@@ -1401,6 +1457,8 @@ def check_budgets_before_lens(lens):
 
 **Spawn counter wrapper (required implementation pattern):**
 
+> **MANDATE.** `spawn_agent` is the ONLY sanctioned path from Moderator to `Agent` in Phase 2a and Phase 3. Calling `Agent(...)` directly is a spec violation — GATE G-3a catches it at the next lens boundary (via `state.spawn_count >= 1`) and GATE G-3c catches it at end-of-Phase-3. If you catch yourself about to write `Agent(...)` directly, substitute `spawn_agent(...)` — same arguments, same return value. The wrapper exists because this substitution is the thing most often skipped under time pressure; skipping it is what produced the Lin 2021 hollow run (`spawn_count: 0` with 9 "completed" lenses).
+
 Every `Agent(...)` call in Phase 3 (and Phase 2a's classification call) MUST go through `spawn_agent(...)` so the budget counters cannot be forgotten at a call site:
 
 ```
@@ -1416,6 +1474,16 @@ This is a drop-in wrapper and does not alter semantics.
 ### End of Phase 3
 
 All active lenses are complete. `state.lenses_completed[]` has one entry per active lens. `state.transcript[]` has all turns (or the full uncompacted record on disk; compacted copies are in-memory only). No persistent subagents exist — every Reviewer and Author turn was a fresh synchronous `Agent` spawn.
+
+**GATE G-3c — end-of-Phase-3 integrity.** Before emitting "Phase 3 complete" and entering Phase 4, assert all four hold:
+
+1. `len(state.lenses_completed) == len([l for l in state.lens_plan if l.depth > 0])` — every active lens has a record.
+2. `state.spawn_count >= 2 * sum(l.depth for l in state.lens_plan if l.depth > 0)` — floor, not ceiling; each depth unit requires ≥1 Reviewer + ≥1 Author spawn. Lin 2021's `spawn_count: 0` fails this trivially.
+3. `len(state.moderator_assessments) >= len(state.lenses_completed)` — at least one moderator read/reasoning/decision entry per completed lens.
+4. `len(state.transcript) >= sum(len(l.transcript_slice) for l in state.lenses_completed)` — transcript contains every turn from every lens slice.
+
+If any fails → `abort_run("phase3_integrity_failed", detail=<which invariant>)`. Do NOT proceed to Phase 4 until all four hold. This is the latest point at which a hollow run can be surfaced before it pollutes Phase 4 synthesis with garbage.
+
 ## Phase 4 — Synthesis
 
 ### Step 4.1: Read CLAUDE.md for sub-project context
@@ -1475,6 +1543,12 @@ else:
   recommendation = "build-on"       # holds up across lenses
 ```
 
+**GATE G-4a — synthesis schema.** Before writing `state.synthesis` below:
+
+- `RECOMMENDATION_ENUM = {"cite", "build-on", "flag", "skip"}`. If `recommendation` is anything else (including `"build-on-with-flags"`, `"strong-build-on"`, `"build-on-with-caveats"`, or any hyphenated variant), **re-run** the decision rule above and pick a valid value. The rule is total — it always yields exactly one of the four.
+- Field name is `verdict`, NOT `tldr_verdict`. There is no `tldr_verdict` key anywhere in the spec; the Phase 5 template placeholder is `{{VERDICT}}` (see Step 5.1).
+- All five synthesis keys below are REQUIRED: `verdict`, `top_killer_questions`, `subproject_relevance`, `recommendation`, `recommendation_rationale`. `top_killer_questions` is an array (`[]` when truly empty, never a pointer string like `"See briefing § Top 5 killer questions"`). `subproject_relevance` is an object, never a pointer string.
+
 Write `state.synthesis`:
 
 ```json
@@ -1506,7 +1580,7 @@ Read `.claude/skills/paper-stress-test/templates/briefing.md`. For each placehol
 
 **Partial-mode substitution rules (when invoked with `partial=True`):**
 
-- `{{TLDR_VERDICT}}` → `"PARTIAL — aborted: " + state.abort_reason + ". " + <detail sentence from abort_run>`.
+- `{{VERDICT}}` → `"PARTIAL — aborted: " + state.abort_reason + ". " + <detail sentence from abort_run>`.
 - `{{TOP_KILLER_QUESTIONS}}` → the literal string `"N/A — run aborted before Phase 4 synthesis; see per-lens findings below."`.
 - `{{RECOMMENDATION}}` → the literal string `"N/A — synthesis not performed."`.
 - `{{SUBPROJECT_RELEVANCE}}` → the literal string `"N/A — synthesis not performed."`.
@@ -1528,7 +1602,7 @@ The briefing filename gets a `-partial` suffix in partial mode: `<slug>_briefing
 | `{{DEPTH}}` | `state.invocation.depth` |
 | `{{REVIEWER_MODEL}}` | `REVIEWER_MODEL` constant from SKILL.md (default `claude-opus-4-7`) — this is the model used for every per-round Reviewer spawn in Phase 3; no subagent handle is persisted under the transcript-relay architecture. |
 | `{{AUTHOR_MODEL}}` | `AUTHOR_MODEL` constant from SKILL.md (default `claude-sonnet-4-6`) — model used for every per-round Author spawn in Phase 3. |
-| `{{TLDR_VERDICT}}` | `state.synthesis.verdict` |
+| `{{VERDICT}}` | `state.synthesis.verdict` |
 | `{{TOP_KILLER_QUESTIONS}}` | rendered as a numbered list from `state.synthesis.top_killer_questions[]` |
 | `{{NOVELTY_SECTION}}` | rendered from `state.novelty_check` (see sub-template below) |
 | `{{SEVERITY_TABLE}}` | markdown table from `state.lenses_completed[]` |
@@ -1606,6 +1680,9 @@ Set `state.run_status = "completed"` and `state.completed_at = <ISO now>`. Write
 ### End of Phase 5
 
 All three output files are on disk. Next: Phase 6 cleanup.
+
+**GATE G-5a — no early return.** Phase 5 does NOT emit the final user-visible summary and does NOT return control to the user; Phase 6 (Step 6.6) does. If you are composing a final reply without having completed Step 6.1 (inline summary), Steps 6.2–6.4 (notebook disposition — Delete / Keep / Promote), Step 6.5 (/tmp cleanup), and Step 6.6 ("Done" line) — STOP and run Phase 6 first. The run is not complete until `state.notebooks.disposable.disposition ∈ {"deleted", "kept", "promoted"}` — `"pending"` and `null` are both spec violations that would leave the disposable NotebookLM notebook leaking. Only the aborted-run path (Step 3.8.5) is allowed to return control with `run_status = "aborted"` and a Phase-6-skipped state.
+
 ## Phase 6 — Cleanup + optional promote-to-thematic
 
 ### Step 6.1: Print inline chat summary
@@ -1748,6 +1825,22 @@ The skill's run is now fully complete. If the user re-invokes on the same paper 
 | `novelty-check` sub-call fails | Set `state.novelty_check.status = "errored"`; continue; Lens 7 falls back (Phase 3.6 degradation table). |
 | `novelty-check` not finished at user confirmation | Wait with status message; after 5 min total, mark `timed_out`; proceed. |
 | Phase 6 promote (`source_add` to thematic) fails | Do NOT delete disposable. Mark `disposition = "pending"`. Print error. User can retry manually. |
+
+## Self-check (post-hoc validator)
+
+`scripts/validate_state.py` loads a `<slug>_state.json` and checks gates G-3a, G-3b, G-3c, G-4a, G-5a. Exits `0` on a well-formed run, `1` on any violation, `2` on I/O or JSON error. The validator is NOT invoked at runtime — the runtime gates above enforce equivalents; this exists for:
+
+1. **Post-hoc triage** of legacy runs that completed despite violations (e.g., the Lin 2021 hollow run before G-3a/G-3b existed).
+2. **Regression testing** proposed SKILL.md edits against archived failed runs. Any gate that doesn't fire on a known hollow run is a gate whose predicate needs patching.
+
+Invocation:
+
+```bash
+python3 .claude/skills/paper-stress-test/scripts/validate_state.py \
+  master_supporting_docs/supporting_papers/stress_tests/state/<slug>_state.json
+```
+
+Output format: `GATE G-XY FAIL: lens <id> (<name>) <which field>` — one line per violation, followed by the total count. Stdlib-only Python 3; no pytest or extra deps.
 
 ## Resumability
 
