@@ -1407,7 +1407,380 @@ This is a drop-in wrapper and does not alter semantics.
 ### End of Phase 3
 
 All active lenses are complete. `state.lenses_completed[]` has one entry per active lens. `state.transcript[]` has all turns (or the full uncompacted record on disk; compacted copies are in-memory only). No persistent subagents exist — every Reviewer and Author turn was a fresh synchronous `Agent` spawn.
-<!-- Phase 4 instructions added in Task 12 -->
-<!-- Phase 5 instructions added in Task 13 -->
-<!-- Phase 6 instructions added in Task 14 -->
-<!-- Error handling + resumability added in Task 18 -->
+## Phase 4 — Synthesis
+
+### Step 4.1: Read CLAUDE.md for sub-project context
+
+```
+CLAUDE_MD = Read("/Users/alison/Library/CloudStorage/OneDrive-UniversityofNorthCarolinaatChapelHill/Research/CLAUDE.md")
+```
+
+Extract sub-project names from the "Sub-Project Hybrid Model" table. Currently: `comparisons/` and `Missing Types/`. Read each sub-project's CLAUDE.md if present for detailed focus.
+
+### Step 4.2: Compose top-5 killer questions
+
+Iterate `state.lenses_completed[]`:
+- For each lens with severity in {critical, major}: extract the Reviewer's final FOLLOWUP or final JUDGMENT REASONING as a candidate killer question.
+- Rank by severity (critical > major), then by whether the author conceded.
+- Keep top 5.
+
+Format each:
+
+```json
+{
+  "question": <verbatim from Reviewer>,
+  "lens_id": <N>,
+  "why_it_matters": <Moderator's 1-sentence synthesis>
+}
+```
+
+### Step 4.3: Sub-project relevance
+
+For each sub-project, ask these four questions and answer each in 1-2 sentences based on the paper content (as surfaced by Author's citations) + the sub-project's focus (from its CLAUDE.md):
+
+1. Does this paper's method apply directly to the sub-project?
+2. Does its data structure match a scenario the sub-project simulates?
+3. Does a critical or major stress-test finding warn against a path the sub-project is taking?
+4. Does the paper provide a comparator or baseline the sub-project is missing?
+
+Answer empty if not applicable; do not force relevance.
+
+### Step 4.4: Compose recommendation
+
+Decision rule:
+
+```
+counts = tally of severities in state.lenses_completed
+critical = counts.critical
+major = counts.major
+novelty_score = state.novelty_check.overall_score  # 0 if errored/skipped
+novelty_rec = state.novelty_check.recommendation    # "PROCEED", "PROCEED WITH CAUTION", "ABANDON", or null
+
+if critical >= 2 or (critical >= 1 and novelty_rec == "ABANDON"):
+  recommendation = "skip"
+elif critical >= 1 or major >= 3 or novelty_rec == "ABANDON":
+  recommendation = "flag"           # methodological caveat in Related Work
+elif any lens_id == 7 severity in {critical, major} or novelty_rec == "PROCEED WITH CAUTION":
+  recommendation = "cite"           # worth referencing, questionable to build on
+else:
+  recommendation = "build-on"       # holds up across lenses
+```
+
+Write `state.synthesis`:
+
+```json
+{
+  "verdict": <1-paragraph TL;DR summarizing severities + novelty + overall>,
+  "top_killer_questions": [<up to 5 objects>],
+  "subproject_relevance": {
+    "comparisons": {"applies": "...", "data_match": "...", "warning": "...", "missing_comparator": "..."},
+    "missing_types": {...}
+  },
+  "recommendation": "cite | build-on | flag | skip",
+  "recommendation_rationale": <2-3 sentences explaining the choice based on counts>
+}
+```
+
+### End of Phase 4
+
+`state.synthesis` is populated. No subagent was used in Phase 4 — all work done by Moderator reading state.json.
+## Phase 5 — Write artifacts
+
+Phase 5 has two invocation modes:
+
+- **Normal** (`partial=False`, default) — called at end of Phase 4 on a healthy run. All sections of the briefing are rendered.
+- **Partial** (`partial=True`) — called by `abort_run` (Step 3.8.5) when a run-budget was exceeded. The briefing is rendered with whatever data is available (mostly Phase 3 lens records, no Phase 4 synthesis), and a PARTIAL banner at the top.
+
+### Step 5.1: Render briefing
+
+Read `.claude/skills/paper-stress-test/templates/briefing.md`. For each placeholder `{{...}}`, substitute the matching value from state.json.
+
+**Partial-mode substitution rules (when invoked with `partial=True`):**
+
+- `{{TLDR_VERDICT}}` → `"PARTIAL — aborted: " + state.abort_reason + ". " + <detail sentence from abort_run>`.
+- `{{TOP_KILLER_QUESTIONS}}` → the literal string `"N/A — run aborted before Phase 4 synthesis; see per-lens findings below."`.
+- `{{RECOMMENDATION}}` → the literal string `"N/A — synthesis not performed."`.
+- `{{SUBPROJECT_RELEVANCE}}` → the literal string `"N/A — synthesis not performed."`.
+- `{{NOVELTY_SECTION}}` → render from `state.novelty_check` as usual if available; else literal `"N/A"`.
+- `{{SEVERITY_TABLE}}`, `{{PER_LENS_FINDINGS}}`, `{{SKIPPED_LENSES}}` → render from `state.lenses_completed` as usual (whatever lenses actually completed get rendered; uncompleted lenses appear under `{{SKIPPED_LENSES}}` with reason `"run aborted"`).
+
+The briefing filename gets a `-partial` suffix in partial mode: `<slug>_briefing-partial.md` rather than `<slug>_briefing.md`.
+
+**Normal-mode substitution table:**
+
+| Placeholder | Source |
+|------------|--------|
+| `{{PAPER_TITLE}}` | `state.paper.title` |
+| `{{PAPER_AUTHORS}}` | `state.paper.authors.join(", ")` |
+| `{{PAPER_YEAR}}` | `state.paper.year` |
+| `{{PAPER_SOURCE}}` | `state.paper.source` |
+| `{{STRESS_TEST_DATE}}` | today (YYYY-MM-DD) |
+| `{{DETECTED_TYPE}}` | `state.detected_type` |
+| `{{DEPTH}}` | `state.invocation.depth` |
+| `{{REVIEWER_MODEL}}` | `REVIEWER_MODEL` constant from SKILL.md (default `claude-opus-4-7`) — this is the model used for every per-round Reviewer spawn in Phase 3; no subagent handle is persisted under the transcript-relay architecture. |
+| `{{AUTHOR_MODEL}}` | `AUTHOR_MODEL` constant from SKILL.md (default `claude-sonnet-4-6`) — model used for every per-round Author spawn in Phase 3. |
+| `{{TLDR_VERDICT}}` | `state.synthesis.verdict` |
+| `{{TOP_KILLER_QUESTIONS}}` | rendered as a numbered list from `state.synthesis.top_killer_questions[]` |
+| `{{NOVELTY_SECTION}}` | rendered from `state.novelty_check` (see sub-template below) |
+| `{{SEVERITY_TABLE}}` | markdown table from `state.lenses_completed[]` |
+| `{{PER_LENS_FINDINGS}}` | iterate lenses_completed, render each as H3 + fields |
+| `{{SKIPPED_LENSES}}` | iterate lens_plan entries with depth=0, with reason |
+| `{{SUBPROJECT_RELEVANCE}}` | from `state.synthesis.subproject_relevance` |
+| `{{RECOMMENDATION}}` | `state.synthesis.recommendation` |
+| `{{RECOMMENDATION_RATIONALE}}` | `state.synthesis.recommendation_rationale` |
+| `{{DISPOSABLE_NOTEBOOK_INFO}}` | name + id + created_at + disposition |
+| `{{PRIOR_TESTS}}` | markdown list of prior `<slug-prefix>_*_briefing.md` files |
+
+Novelty section sub-template:
+
+```markdown
+## External novelty check
+
+{{#if status == "completed"}}
+- **Overall score:** {{overall_score}}/10
+- **Recommendation:** {{recommendation}}
+- **Key differentiator:** {{key_differentiator}}
+
+### Closest prior work
+
+| Paper | Year | Venue | Overlap | Key difference |
+|-------|------|-------|---------|----------------|
+{{#each closest_prior_work}} | {{paper}} | {{year}} | {{venue}} | {{overlap}} | {{key_difference}} |
+{{/each}}
+
+{{#if has_raw}}
+<details><summary>Full novelty-check report</summary>
+
+{{raw_report_md}}
+
+</details>
+{{/if}}
+{{else}}
+_novelty-check was **{{status}}** — external novelty verification not available for this briefing._
+{{/if}}
+```
+
+Moderator renders this section in plain Markdown (no real template engine — conditional logic is simulated via direct prose writing).
+
+Write to `${OUT_ROOT}/briefing/${FULL_SLUG}_briefing.md`.
+
+### Step 5.2: Render transcripts
+
+For each lens in `state.lenses_completed[]`:
+
+```markdown
+## Lens {{lens_id}} — {{name}}
+
+Severity: **{{severity}}**
+
+{{#each turns}}
+### Turn {{turn}} — {{role}} ({{timestamp}})
+
+{{text}}
+
+{{#if citations}}
+**Citations:**
+{{#each citations}}
+- {{this}}
+{{/each}}
+{{/if}}
+
+{{/each}}
+```
+
+Prepend a header with paper metadata and write to `${OUT_ROOT}/transcripts/${FULL_SLUG}_transcripts.md`.
+
+### Step 5.3: Finalize state.json
+
+Set `state.run_status = "completed"` and `state.completed_at = <ISO now>`. Write (atomic) to `${OUT_ROOT}/state/${FULL_SLUG}_state.json`.
+
+### End of Phase 5
+
+All three output files are on disk. Next: Phase 6 cleanup.
+## Phase 6 — Cleanup + optional promote-to-thematic
+
+### Step 6.1: Print inline chat summary
+
+Print (substituting actual values):
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Stress-test complete for <Author Year title>.
+
+Verdict: <TL;DR one-liner from state.synthesis.verdict>
+
+Top findings:
+  1. [<sev>] <finding one-liner>
+  2. [<sev>] ...
+  3. ...
+  4. ...
+  5. ...
+
+Recommendation: <cite | build-on | flag | skip>
+
+Files written:
+  Briefing: <abs path>
+  Transcripts: <abs path>
+  State: <abs path>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### Step 6.2: Decide default option for the disposable notebook
+
+```
+max_severity = max severity in state.lenses_completed (order: critical > major > minor > clean)
+recommendation = state.synthesis.recommendation
+
+if recommendation in {"cite", "build-on"} and max_severity in {"clean", "minor"}:
+  default = "P"  # promote
+elif recommendation == "skip" or max_severity == "critical":
+  default = "D"  # delete
+else:
+  default = "K"  # keep standalone
+```
+
+If `state.notebooks.thematic.id` is null (no thematic resolved this run), option `[P]` is **hidden** and the default becomes `"K"` if it would have been `"P"`.
+
+### Step 6.3: Prompt user
+
+```
+Disposable notebook: "<name>"
+What should I do with it?
+
+  [D] Delete — paper doesn't hold up or isn't worth keeping
+  [K] Keep standalone — query later without adding to thematic
+  [P] Promote — add this paper as a source to thematic notebook "<thematic_name>", then delete disposable
+
+Default: [<default letter>] (based on <cite/build-on/skip> + <max_severity>)
+
+Choice:
+```
+
+Accept `D`, `K`, `P`, or empty (use default).
+
+### Step 6.4: Execute the chosen action
+
+#### [D] Delete
+
+```
+mcp__notebooklm__notebook_delete(notebook_id: state.notebooks.disposable.id)
+```
+
+On success: update `state.notebooks.disposable.disposition = "deleted"`, rewrite state.json.
+On failure: print error, leave disposition as `"pending"`, instruct user to delete manually from NotebookLM web UI.
+
+#### [K] Keep
+
+No notebook operations. Update `state.notebooks.disposable.disposition = "kept"`, rewrite state.json.
+
+#### [P] Promote
+
+```
+1. mcp__notebooklm__source_add(
+     notebook_id: state.notebooks.thematic.id,
+     source_type: "file",
+     file_path: <original_pdf_path>
+   )
+2. If step 1 succeeded:
+     mcp__notebooklm__notebook_delete(notebook_id: state.notebooks.disposable.id)
+     state.notebooks.disposable.disposition = "promoted"
+     state.notebooks.disposable.promoted_to = state.notebooks.thematic.id
+3. If step 1 failed:
+     Print: "Promote failed: <error>. Disposable notebook preserved — you can retry manually or re-run the skill with [K] later."
+     disposition stays "pending"
+4. Rewrite state.json.
+```
+
+### Step 6.5: Clean up /tmp download artifacts
+
+If Phase 0 downloaded the paper into `/tmp/` (arXiv ID or URL paths only — local-file paths are untouched), remove the downloaded PDF now:
+
+```bash
+# Only run if paper source was arXiv or URL (downloaded to /tmp)
+# state.paper.source tells us whether this applies
+case "$(jq -r '.paper.source' "${STATE_FILE}")" in
+  /tmp/arxiv-*.pdf|/tmp/paper-*.pdf)
+    rm -f "$(jq -r '.paper.source' "${STATE_FILE}")"
+    ;;
+esac
+```
+
+Local-file sources under `Papers/` or `master_supporting_docs/supporting_papers/` are NEVER deleted — those are user-owned. Only the `/tmp/` download artifacts from arXiv/URL pulls are cleaned up.
+
+### Step 6.6: Final print
+
+```
+Done. state.json finalized at <path>.
+```
+
+### End of Phase 6 (and end of run)
+
+The skill's run is now fully complete. If the user re-invokes on the same paper on a later date, a new slug will be generated (new date suffix) and Phase 0 prior-test detection will surface this briefing.
+## Error handling
+
+| Failure | Handling |
+|---------|----------|
+| NotebookLM MCP unavailable | Fatal. No fallback. Print: `NotebookLM MCP not reachable. Run 'nlm login' and retry.` |
+| Paper file not found | Fatal with path in error message. |
+| arXiv download fails twice | Fatal. |
+| `notebook_create` fails twice | Fatal. |
+| `source_add` fails twice | Delete the disposable notebook (if created), then fatal. |
+| Thematic notebook not found (`--cross-check` mismatch) | Fatal at Phase 1.3 — malformed argument. |
+| Reviewer spawn fails | Retry once; second failure fatal. |
+| Author spawn fails | Retry once; second failure fatal. |
+| Subagent returns malformed output format | Reprompt once with format reminder; if still malformed, record that lens as `errored` and continue. |
+| Single lens NotebookLM query fails | Record turn as `errored`; lens severity = `errored`; continue to next lens. |
+| Running transcript approaches `COMPACTION_THRESHOLD_CHARS` (80000) | Compact the transcript (Phase 3.7) — summarize completed lenses to their `summary_for_compaction` bullets; current lens remains verbatim. The full `state.transcript` is preserved on disk. |
+| `state.spawn_count >= state.spawn_budget` (default 80) | `abort_run("spawn_budget_exceeded", …)` at top of next lens iteration. Write partial briefing (Phase 5 with `partial=True`); instruct user to resume. |
+| Wall-clock elapsed ≥ `state.wall_clock_budget_s` (default 1800s) | `abort_run("wall_clock_exceeded", …)` at top of next lens iteration. Same partial-briefing + resume flow. |
+| `state.moderator_own_context_est_chars >= MODERATOR_OWN_CONTEXT_SOFT_LIMIT_CHARS` (1_600_000 chars ≈ 400K tokens) | `abort_run("moderator_context_exceeded", …)` at top of next lens iteration. Same flow. Resume starts a fresh Moderator context and rebuilds `running_ctx` via `maybe_compact()` from `state.transcript`. |
+| state.json write fails | Retry once using `.bak`; second failure fatal. |
+| User aborts at plan confirmation | Delete disposable notebook; do not write state file; exit cleanly. |
+| `novelty-check` sub-call fails | Set `state.novelty_check.status = "errored"`; continue; Lens 7 falls back (Phase 3.6 degradation table). |
+| `novelty-check` not finished at user confirmation | Wait with status message; after 5 min total, mark `timed_out`; proceed. |
+| Phase 6 promote (`source_add` to thematic) fails | Do NOT delete disposable. Mark `disposition = "pending"`. Print error. User can retry manually. |
+
+## Resumability
+
+Every Phase 3 lens persists `state.json` (atomic write `.tmp` + `mv`) before advancing. If a run is interrupted (user aborts, subagent crashes, NotebookLM flake, machine restart), the next invocation on the same `<paper-ref>` the same day will see the existing `state.json` and offer:
+
+```
+A stress-test with today's slug is already in progress:
+  {{FULL_SLUG}}_state.json (run_status: in_progress, lenses_completed: N of M)
+
+Choose:
+  [R] Resume from lens N+1 (reuses disposable + thematic notebooks, reuses novelty-check report)
+  [S] Start fresh (overwrites state; existing briefing untouched if already written)
+  [A] Abort
+```
+
+### Resume behavior ([R])
+
+1. Load `state.json` fully. Under the transcript-relay architecture there are NO persistent subagents to re-attach; the only runtime state is (a) the Moderator's running transcript and (b) the per-lens records already in `state.lenses_completed`.
+2. **Clean up stale novelty-check state.** On resume, any background `runner_agent_id` from the prior session has long since expired (or notified and been missed). Do NOT attempt to collect from it. Apply the rule:
+   - If `state.novelty_check.status == "running"`: set `status = "timed_out"`, `completed_at = <ISO now>`, `raw_report_md = null`. Lens 7 (if not yet completed) will degrade accordingly. The stale `runner_agent_id` is preserved in the record only for debugging; never referenced operationally.
+   - If `status ∈ {"completed", "errored", "skipped", "timed_out"}`: keep as-is.
+3. **Apply run-budget reset policy** (see Step 3.7.5 and Step 3.8.5):
+   - `state.moderator_own_context_est_chars` → **reset to 0** (new session = new Main-Claude context).
+   - `state.spawn_count` → **preserved** (do NOT reset; a runaway spawn loop should stay aborted across a resume).
+   - `state.wall_clock_start` → **preserved** (same rationale).
+   - `state.abort_reason` → **cleared to `null`** (the resumed run is no longer in an aborted state; if any budget is still exceeded on the very first `check_budgets_before_lens` call, it will re-abort).
+   - If the user wants to legitimately raise a budget before resuming (e.g., the spawn budget was set too low), they must edit `state.spawn_budget` / `state.wall_clock_budget_s` in `state.json` manually before invoking resume.
+4. Verify disposable notebook still exists via `mcp__notebooklm__notebook_list()` lookup. If it's been deleted externally, abort with error.
+5. Verify thematic notebook still exists (same check). If the thematic was resolved in the original run but has since been deleted, downgrade Lens 7's mode (if not yet completed) per the degradation table in Step 3.6.
+6. **Rebuild the running transcript, not the subagents.** Load `REVIEWER_PERSONA` and `AUTHOR_PERSONA` from disk (Step 3.2). Set `state.transcript` as-is from the file; set `running_ctx = maybe_compact(state.transcript)` (Step 3.7) to get the compacted context used for the next lens's first round. No subagent spawn happens at resume — the next per-round spawn in Phase 3 behaves normally.
+7. Jump to Phase 3 lens loop starting at the first `lens_plan` entry whose `lens_id` is NOT in `state.lenses_completed`. The lens-loop top immediately calls `check_budgets_before_lens(lens)` — if any preserved budget is still exceeded, the resume immediately re-aborts with the same reason (the intended behavior for runaway-loop aborts).
+8. Continue to Phases 4, 5, 6 normally.
+9. Record the resume event in `state.compaction_history` (the only history field that survives the 2026-04-22 architecture amendment):
+
+   ```json
+   {"at_lens": <next_lens_id>, "reason": "session resume", "before_size": <transcript_char_count>, "after_size": <running_ctx_char_count>, "lenses_collapsed": [<ids collapsed by maybe_compact>], "timestamp": "<ISO 8601>"}
+   ```
+
+### Start fresh ([S])
+
+Delete the old state.json (do NOT delete the old briefing if it was ever written — that's a record). Delete the old disposable notebook (it will be recreated). Restart from Phase 1.
+
+### Abort ([A])
+
+Exit cleanly, leave state.json untouched.
