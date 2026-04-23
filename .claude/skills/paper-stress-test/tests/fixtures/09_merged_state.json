@@ -1,0 +1,99 @@
+{
+  "run_status": "completed",
+  "architecture": "parallel",
+  "paper": {
+    "title": "Test Paper for Merge Consistency",
+    "authors": "Doe J, Roe K",
+    "year": 2026
+  },
+  "wall_clock_start": "2026-04-23T15:00:00Z",
+  "wall_clock_end": "2026-04-23T15:30:00Z",
+  "spawn_count": 22,
+  "lens_plan": [
+    {"lens_id": 0, "name": "Identification", "depth": 2},
+    {"lens_id": 1, "name": "Estimand", "depth": 1},
+    {"lens_id": 2, "name": "Estimator", "depth": 2},
+    {"lens_id": 3, "name": "Model family", "depth": 1},
+    {"lens_id": 4, "name": "Tuning", "depth": 2},
+    {"lens_id": 5, "name": "Calibration", "depth": 1},
+    {"lens_id": 6, "name": "Generalization", "depth": 2},
+    {"lens_id": 7, "name": "Positioning", "depth": 2},
+    {"lens_id": 8, "name": "Reproducibility", "depth": 1}
+  ],
+  "lenses_completed": [
+    {"lens_id": 0, "name": "Identification", "severity": "major", "one_line_finding": "SUTVA claimed without spillover argument.", "evidence": "Section 3.1", "author_best_defense": "Section 3.1 states SUTVA by assumption.", "why_it_didnt_hold": "No sensitivity analysis.", "summary_for_compaction": "Major: SUTVA asserted only.", "moderator_signals": ["progressing"], "transcript_slice": [{"r": 1}, {"r": 1}, {"r": 2}]},
+    {"lens_id": 1, "name": "Estimand", "severity": "clean", "one_line_finding": "ATE on restricted population stated.", "evidence": "Section 2.2", "author_best_defense": "Section 2.2 explicit.", "summary_for_compaction": "Clean.", "moderator_signals": ["converging"], "transcript_slice": [{"r": 1}, {"r": 1}, {"r": 2}]},
+    {"lens_id": 2, "name": "Estimator", "severity": "minor", "one_line_finding": "Jackknife heuristic only.", "evidence": "Theorem 3", "author_best_defense": "Appendix C heuristic.", "why_it_didnt_hold": "Informal proof.", "summary_for_compaction": "Minor.", "moderator_signals": ["progressing"], "transcript_slice": [{"r": 1}, {"r": 1}, {"r": 2}]},
+    {"lens_id": 3, "name": "Model family", "severity": "minor", "one_line_finding": "RF chosen by convention.", "evidence": "Section 4.1", "author_best_defense": "Standard for pseudo-obs.", "why_it_didnt_hold": "Appeal to convention.", "summary_for_compaction": "Minor.", "moderator_signals": ["converging"], "transcript_slice": [{"r": 1}, {"r": 1}, {"r": 2}]},
+    {"lens_id": 4, "name": "Tuning", "severity": "major", "one_line_finding": "OOB tuning leaks into evaluation.", "evidence": "Section 4.3", "author_best_defense": "OOB is unbiased for bagged estimators.", "why_it_didnt_hold": "OOB is in-sample.", "summary_for_compaction": "Major.", "moderator_signals": ["progressing"], "transcript_slice": [{"r": 1}, {"r": 1}, {"r": 2}]},
+    {"lens_id": 5, "name": "Calibration", "severity": "clean", "one_line_finding": "Reliability diagram provided.", "evidence": "Figure 4", "author_best_defense": "Figure 4 shows calibration.", "summary_for_compaction": "Clean.", "moderator_signals": ["converging"], "transcript_slice": [{"r": 1}, {"r": 1}, {"r": 2}]},
+    {"lens_id": 6, "name": "Generalization", "severity": "major", "one_line_finding": "External validation missing.", "evidence": "absent", "author_best_defense": "the paper does not address this", "why_it_didnt_hold": "No out-of-cohort experiment.", "summary_for_compaction": "Major.", "moderator_signals": ["stalling"], "transcript_slice": [{"r": 1}, {"r": 1}, {"r": 2}]},
+    {"lens_id": 7, "name": "Positioning", "severity": "major", "one_line_finding": "Comparator omissions: frailty models not discussed.", "evidence": "Section 5.2", "author_best_defense": "τ-RMST estimand described with Chemo A example.", "why_it_didnt_hold": "Frailty comparator not addressed; IPW logistic ablation missing.", "summary_for_compaction": "Major.", "moderator_signals": ["progressing"], "transcript_slice": [{"r": 1}, {"r": 1}, {"r": 2}, {"r": 3}]},
+    {"lens_id": 8, "name": "Reproducibility", "severity": "minor", "one_line_finding": "GitHub repo exists; seed absent.", "evidence": "Section 6", "author_best_defense": "Code at github.com/authors/repo.", "why_it_didnt_hold": "Seed missing from manuscript.", "summary_for_compaction": "Minor.", "moderator_signals": ["converging"], "transcript_slice": [{"r": 1}, {"r": 1}, {"r": 2}]}
+  ],
+  "moderator_assessments": [
+    {"lens_id": 0, "round": 1, "decision": "continue"},
+    {"lens_id": 0, "round": 2, "decision": "close_lens"},
+    {"lens_id": 1, "round": 1, "decision": "close_lens"},
+    {"lens_id": 2, "round": 1, "decision": "continue"},
+    {"lens_id": 2, "round": 2, "decision": "close_lens"},
+    {"lens_id": 3, "round": 1, "decision": "close_lens"},
+    {"lens_id": 4, "round": 1, "decision": "continue"},
+    {"lens_id": 4, "round": 2, "decision": "close_lens"},
+    {"lens_id": 5, "round": 1, "decision": "close_lens"},
+    {"lens_id": 6, "round": 1, "decision": "close_lens"},
+    {"lens_id": 7, "round": 1, "decision": "continue"},
+    {"lens_id": 7, "round": 2, "decision": "close_lens"},
+    {"lens_id": 8, "round": 1, "decision": "close_lens"}
+  ],
+  "transcript": [
+    {"lens_id": 0, "role": "reviewer", "round": 1},
+    {"lens_id": 0, "role": "author", "round": 1},
+    {"lens_id": 0, "role": "reviewer", "round": 2},
+    {"lens_id": 1, "role": "reviewer", "round": 1},
+    {"lens_id": 1, "role": "author", "round": 1},
+    {"lens_id": 1, "role": "reviewer", "round": 2},
+    {"lens_id": 2, "role": "reviewer", "round": 1},
+    {"lens_id": 2, "role": "author", "round": 1},
+    {"lens_id": 2, "role": "reviewer", "round": 2},
+    {"lens_id": 3, "role": "reviewer", "round": 1},
+    {"lens_id": 3, "role": "author", "round": 1},
+    {"lens_id": 3, "role": "reviewer", "round": 2},
+    {"lens_id": 4, "role": "reviewer", "round": 1},
+    {"lens_id": 4, "role": "author", "round": 1},
+    {"lens_id": 4, "role": "reviewer", "round": 2},
+    {"lens_id": 5, "role": "reviewer", "round": 1},
+    {"lens_id": 5, "role": "author", "round": 1},
+    {"lens_id": 5, "role": "reviewer", "round": 2},
+    {"lens_id": 6, "role": "reviewer", "round": 1},
+    {"lens_id": 6, "role": "author", "round": 1},
+    {"lens_id": 6, "role": "reviewer", "round": 2},
+    {"lens_id": 7, "role": "reviewer", "round": 1},
+    {"lens_id": 7, "role": "author", "round": 1},
+    {"lens_id": 7, "role": "reviewer", "round": 2},
+    {"lens_id": 7, "role": "reviewer", "round": 3},
+    {"lens_id": 8, "role": "reviewer", "round": 1},
+    {"lens_id": 8, "role": "author", "round": 1},
+    {"lens_id": 8, "role": "reviewer", "round": 2}
+  ],
+  "synthesis": {
+    "verdict": "Build on with four mitigations: add spillover sensitivity, external validation, IPW ablation, and explicit seed.",
+    "top_killer_questions": [
+      "How does your method handle cluster-level spillover under the CareQOL design?",
+      "What is the out-of-cohort generalization gap?",
+      "Why omit the frailty comparator in positioning?",
+      "What are the effects of OOB-only tuning on outer-loop C-index?",
+      "Is the jackknife variance proof rigorous for the IPW-weighted case?"
+    ],
+    "subproject_relevance": {
+      "comparisons": "Medium",
+      "missing_types": "Low"
+    },
+    "recommendation": "build-on",
+    "recommendation_rationale": "Core estimand and estimator are sound; four methodological gaps are addressable in revision."
+  },
+  "notebooks": {
+    "disposable": {"id": "test-disp-id", "disposition": "deleted"}
+  },
+  "disposition": "deleted"
+}

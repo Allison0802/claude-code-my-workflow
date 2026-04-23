@@ -1,0 +1,46 @@
+{
+  "group_id": 1,
+  "lens_ids_assigned": [3, 4, 5],
+  "lens_records": [
+    {
+      "lens_id": 3,
+      "name": "Model family",
+      "severity": "minor",
+      "one_line_finding": "Random forest choice justified heuristically; no comparison to gradient boosting.",
+      "evidence": "Section 4.1 cites Breiman 2001 but does not compare alternatives.",
+      "author_best_defense": "Section 4.1 notes RF is 'standard for pseudo-observation regression' citing Overgaard et al. 2017.",
+      "why_it_didnt_hold": "Appeal to convention without empirical comparison.",
+      "summary_for_compaction": "Lens 3 (Model family): minor — RF choice conventional; no bake-off with GBM/NN.",
+      "moderator_signals": ["converging"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: Why RF over GBM?", "timestamp_iso": "2026-04-23T15:10:00Z"},
+        {"role": "author", "round": 1, "content": "ANSWER: Section 4.1 ...\nCITATIONS:\n- \"standard for pseudo-observation regression\" — Section 4.1", "timestamp_iso": "2026-04-23T15:10:30Z"},
+        {"role": "reviewer", "round": 2, "content": "JUDGMENT: handwaved\nREASONING: appeal to convention\nNEXT: FINAL\nSEVERITY: minor", "timestamp_iso": "2026-04-23T15:10:55Z"}
+      ]
+    },
+    {
+      "lens_id": 4,
+      "name": "Tuning",
+      "severity": "major",
+      "one_line_finding": "Hyperparameters tuned on the full dataset, not cross-validated — risk of leakage.",
+      "evidence": "Section 4.3: 'mtry and ntree were chosen to minimize out-of-bag error.'",
+      "author_best_defense": "Section 4.3 describes OOB tuning, which the paper argues is unbiased for bagged estimators.",
+      "why_it_didnt_hold": "OOB tuning is in-sample; does not address the outer-loop evaluation leakage the reviewer flagged.",
+      "summary_for_compaction": "Lens 4 (Tuning): major — OOB-only tuning leaks into outer-loop C-index.",
+      "moderator_signals": ["progressing"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: How were hyperparameters chosen?", "timestamp_iso": "2026-04-23T15:11:20Z"},
+        {"role": "author", "round": 1, "content": "ANSWER: Section 4.3 ...\nCITATIONS:\n- \"mtry and ntree were chosen to minimize out-of-bag error\" — Section 4.3", "timestamp_iso": "2026-04-23T15:12:00Z"},
+        {"role": "reviewer", "round": 2, "content": "JUDGMENT: handwaved\nREASONING: OOB is in-sample\nNEXT: FINAL\nSEVERITY: major", "timestamp_iso": "2026-04-23T15:12:30Z"}
+      ]
+    }
+  ],
+  "local_gate_results": {
+    "g3a_local": {"passed": false, "violations": ["group 1 exited early; lens_id 5 not run"]},
+    "g3b_local": {"passed": true, "violations": []}
+  },
+  "partial_state_path": "/tmp/stress_tests/state/testpaper_2026_shorttitle_2026-04-23_group_1.json",
+  "group_spawn_count": 4,
+  "aborted": true,
+  "abort_reason": "wall_clock_exceeded"
+}

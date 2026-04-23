@@ -1,0 +1,61 @@
+{
+  "group_id": 0,
+  "lens_ids_assigned": [0, 1, 2],
+  "lens_records": [
+    {
+      "lens_id": 0,
+      "name": "Identification",
+      "severity": "major",
+      "one_line_finding": "SUTVA is claimed but spillover between treatment clusters is never addressed.",
+      "evidence": "Section 3.1, Assumption A2: 'treatment assignment is independent across units.'",
+      "author_best_defense": "Section 3.1 states that SUTVA holds by assumption but does not quantify plausibility under the CareQOL design.",
+      "why_it_didnt_hold": "Author cited the assumption statement but did not produce a sensitivity analysis or external justification.",
+      "summary_for_compaction": "Lens 0 (Identification): major — SUTVA asserted without cluster-level spillover argument; Author quoted the assumption line but offered no sensitivity check.",
+      "moderator_signals": ["progressing", "stalling"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: The SUTVA assumption ...", "timestamp_iso": "2026-04-23T15:02:00Z"},
+        {"role": "author", "round": 1, "content": "ANSWER: Section 3.1 ...\nCITATIONS:\n- \"treatment assignment is independent across units.\" — Section 3.1", "timestamp_iso": "2026-04-23T15:02:45Z"},
+        {"role": "reviewer", "round": 2, "content": "JUDGMENT: handwaved\nREASONING: ...\nNEXT: FINAL\nSEVERITY: major", "timestamp_iso": "2026-04-23T15:03:20Z"}
+      ]
+    },
+    {
+      "lens_id": 1,
+      "name": "Estimand",
+      "severity": "clean",
+      "one_line_finding": "Estimand is explicitly stated as ATE on the restricted population; assumptions match.",
+      "evidence": "Section 2.2: 'we target E[Y(1) - Y(0) | S = 1].'",
+      "author_best_defense": "Section 2.2 defines the estimand explicitly with the restriction S=1, and Theorem 1 proves identification.",
+      "summary_for_compaction": "Lens 1 (Estimand): clean — ATE on S=1 subpopulation stated; Theorem 1 identification given assumptions A1-A3.",
+      "moderator_signals": ["converging"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: What is the target estimand ...", "timestamp_iso": "2026-04-23T15:04:00Z"},
+        {"role": "author", "round": 1, "content": "ANSWER: Section 2.2 ...\nCITATIONS:\n- \"E[Y(1) - Y(0) | S = 1]\" — Section 2.2", "timestamp_iso": "2026-04-23T15:04:40Z"},
+        {"role": "reviewer", "round": 2, "content": "JUDGMENT: cited\nREASONING: explicit definition with restriction\nNEXT: FINAL\nSEVERITY: clean", "timestamp_iso": "2026-04-23T15:05:10Z"}
+      ]
+    },
+    {
+      "lens_id": 2,
+      "name": "Estimator",
+      "severity": "minor",
+      "one_line_finding": "Jackknife variance is claimed but not proved for the specific pseudo-obs construction used.",
+      "evidence": "Theorem 3 cites Overgaard (2019) for regularity conditions that apply only to the unweighted case.",
+      "author_best_defense": "Theorem 3 argues regularity extends by continuous mapping; Appendix C gives a heuristic derivation.",
+      "why_it_didnt_hold": "Appendix C is heuristic only; the IPW-weighted jackknife lacks a formal proof of asymptotic normality.",
+      "summary_for_compaction": "Lens 2 (Estimator): minor — jackknife variance proof informal for IPW case; partial citation to Overgaard 2019.",
+      "moderator_signals": ["progressing", "converging"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: The jackknife variance ...", "timestamp_iso": "2026-04-23T15:05:45Z"},
+        {"role": "author", "round": 1, "content": "ANSWER: Theorem 3 ...\nCITATIONS:\n- \"regularity extends by continuous mapping\" — Theorem 3", "timestamp_iso": "2026-04-23T15:06:20Z"},
+        {"role": "reviewer", "round": 2, "content": "JUDGMENT: handwaved\nREASONING: citation is to unweighted case\nNEXT: FINAL\nSEVERITY: minor", "timestamp_iso": "2026-04-23T15:06:55Z"}
+      ]
+    }
+  ],
+  "local_gate_results": {
+    "g3a_local": {"passed": true, "violations": []},
+    "g3b_local": {"passed": true, "violations": []}
+  },
+  "partial_state_path": "/tmp/stress_tests/state/testpaper_2026_shorttitle_2026-04-23_group_0.json",
+  "group_spawn_count": 6,
+  "aborted": false,
+  "abort_reason": null
+}

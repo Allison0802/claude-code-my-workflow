@@ -192,6 +192,23 @@ For `closest_prior_work`, split each table row on `|` (strip pipes and whitespac
 
 If any field fails to parse, leave it `null`. Do NOT fail the whole run — the raw report is kept in `raw_report_md` regardless.
 
+#### 8. Group-agent return payload (Phase 3 parallel dispatch)
+
+Each of the three parallel group moderators (see §Phase 3, `agents/group_moderator.md`) returns a **single JSON object** as its final text, no prose preamble, no markdown fences. The Moderator parses every group return with this schema:
+
+```
+^\s*\{[\s\S]*"group_id"\s*:\s*([0-2])[\s\S]*"lens_records"\s*:\s*\[[\s\S]*\][\s\S]*"partial_state_path"\s*:\s*"([^"]+)"[\s\S]*\}\s*$
+```
+
+Validation (all MUST pass, otherwise treat the group as errored and re-dispatch once):
+
+- Top-level parses as a JSON object with required keys: `group_id` ∈ {0,1,2}; `lens_records` (array, 0–3 entries); `local_gate_results` (object with `g3a_local` and `g3b_local` sub-objects each having boolean `passed`); `partial_state_path` (string, absolute path, file exists on disk); `group_spawn_count` (int ≥ 0); `aborted` (bool); `abort_reason` (string or null).
+- For each entry in `lens_records`, all 9 keys from §G-3b (lens record schema) are present with correct types.
+- If `aborted == false`, `len(lens_records) == 3`. If `aborted == true`, `abort_reason` is non-null.
+- The file at `partial_state_path` exists, parses as JSON, and has the same `group_id` and `lens_records` as the return payload (consistency check).
+
+Out-of-order arrival: the Moderator buffers payloads by `group_id` in a dict and does NOT begin merge/synthesis until `len(received) == 3` (or until all un-received groups have exhausted their retry budget, in which case G-3a-aggregate catches the hollow-run).
+
 ### Cross-reference (updated 2026-04-22 evening for the transcript-relay Phase 3 step numbering)
 
 | Pattern | Used in tasks |
@@ -203,6 +220,7 @@ If any field fails to parse, leave it `null`. Do NOT fail the whole run — the 
 | 5. Author answer (ANSWER + CITATIONS) | T8 Step 3.5 (every Author turn), T9 Step 3.6 (rounds 1 and 2 Author turns) |
 | 6. Classification triple | T4 Step 2.3 |
 | 7. novelty-check | T5 Step 2.6 |
+| 8. Group-agent return payload | Phase 3 Step 3.4 (parallel dispatch), Step 3.8 (merge) |
 
 ## Defer-tool preamble
 
@@ -758,16 +776,30 @@ State.json now contains:
 - Empty `transcript`, `moderator_assessments`, `compaction_history` — all populated during Phase 3.
 
 No subagent handles are persisted; the Phase 2a classification call was one-shot, and Phase 3 spawns fresh Reviewer and Author subagents per round (see §Architecture Amendment).
-## Phase 3 — Adversarial debate loop
+## Phase 3 — Adversarial debate loop (parallel 3×3 group dispatch)
+
+> **Architecture at a glance.** The Moderator (the skill itself) does NOT iterate the 9 lenses. It dispatches **3 parallel group-agents** via a single assistant message containing 3 concurrent `Agent` tool calls. Each group-agent (`agents/group_moderator.md`) owns 3 pre-assigned lenses, runs the per-lens Reviewer↔Author debate inside its own context, writes an atomic partial state file, and returns a JSON payload (Parsing contract §8). The Moderator buffers the 3 returns by `group_id`, merges partial state files, re-runs G-3a/G-3b at aggregate level, and proceeds to Phase 4. **Steps 3.5 and 3.6 describe the per-lens debate loop that now runs inside each group-agent, not in the Moderator's own context.**
 
 > **Anti-rationalization table — do NOT take these shortcuts.** Hollow runs (all lenses "completed" with empty state) arise when Moderator substitutes these framings for the actual debate loop. Each one is a spec violation.
 >
 > | Rationalization | Why it's wrong |
 > |---|---|
 > | "I can infer severity from Phase 2a classification output; no Reviewer spawn needed." | Severity must come from a Reviewer JUDGMENT emitted in an Agent spawn, per **Parsing contract §2** and Step 3.8 step 1. Classification in Phase 2a produces only `detected_type`, `headline_claim`, `novelty_claims` — not per-lens severities. |
-> | "I'll write the briefing first, then backfill state.json at the end." | `state.json` is the source of truth and MUST be persisted per-lens (Step 3.8 step 4, atomic `.tmp` + `mv`). The briefing is DERIVED from state.json in Phase 5, never vice-versa. |
+> | "I'll write the briefing first, then backfill state.json at the end." | `state.json` is the source of truth and MUST be persisted per-group (Step 3.8). The briefing is DERIVED from state.json in Phase 5, never vice-versa. |
 > | "The transcript belongs in `transcripts/*.md`, not in `state.transcript`." | Both. `state.transcript` is the machine-readable truth used by compaction (Step 3.7), resume (Resumability), and validator (Self-check). `transcripts/*.md` is a human-readable render produced in Step 5.2 from `state.lenses_completed[*].transcript_slice`. |
 > | "The briefing is the deliverable; state.json is bookkeeping." | state.json is the deliverable. Partial-mode briefing (Step 5.1) reads from state.json when Phase 4 never ran; if state.json is hollow, partial-mode produces garbage. |
+> | "I'll dispatch the 3 groups one at a time to stay under the spawn budget." | Sequential dispatch saves zero tokens (total spawn count is identical). Phase 3's purpose is wall-clock reduction via parallelism. The MUST-NOTs below make this a hard violation. |
+> | "One group-agent failed — I'll re-run the other two sequentially in the Moderator to be safe." | Silent degradation to sequential is the exact hollow-run pattern the gates exist to catch. Re-dispatch the failed group (see Step 3.4 retry). Never run lens debates in the Moderator's own context. |
+> | "I'll run the 9 lenses as 9 parallel Agent calls instead — more parallelism is better." | The architecture is 3×3 by design. 9-way fan-out triples persona-prompt tokens, fragments budget gates, and breaks the group_moderator.md contract. |
+> | "I can compact each group-agent's transcript before merging to save memory." | Compaction happens in Step 3.7 AFTER merge, operated by the Moderator. Group-agents return verbatim transcript_slice entries; mid-flight compaction corrupts the audit trail. |
+
+**MUST-NOTs for Phase 3 (hard spec violations, not preferences):**
+
+1. **MUST dispatch all 3 group-agents in a single assistant message** containing 3 concurrent `Agent` tool_use blocks (Step 3.4 step 3). Sequential dispatch is a spec violation.
+2. **MUST NOT await any group-agent result before dispatching the next.** The scheduler spawns all 3, then buffers returns.
+3. **MUST NOT process lens records for Phase 4 until all 3 partial state files exist on disk AND the aggregate G-3a/G-3b gates pass** (Step 3.8 merge).
+4. **MUST NOT run per-lens Reviewer or Author spawns in the Moderator's own context.** All per-lens debate happens inside group-agents. The Moderator orchestrates; it does not debate.
+5. **MUST NOT write to the canonical `${FULL_SLUG}_state.json`** from within a group-agent. Group-agents write only to their own `${FULL_SLUG}_group_${N}.json` partial.
 
 ### Phase 3 start: Capture wall_clock_start
 
@@ -790,14 +822,15 @@ No sleep, no polling. The second check point at Lens 7 catches results that arri
 
 ### Step 3.2: Load persona templates once
 
-Read both persona files with the `Read` tool and keep them in Moderator memory:
+Read all three persona files with the `Read` tool and keep them in Moderator memory:
 
 ```
-REVIEWER_PERSONA = Read(".claude/skills/paper-stress-test/agents/reviewer.md")
-AUTHOR_PERSONA   = Read(".claude/skills/paper-stress-test/agents/author.md")
+REVIEWER_PERSONA        = Read(".claude/skills/paper-stress-test/agents/reviewer.md")
+AUTHOR_PERSONA          = Read(".claude/skills/paper-stress-test/agents/author.md")
+GROUP_MODERATOR_PERSONA = Read(".claude/skills/paper-stress-test/agents/group_moderator.md")
 ```
 
-These are stateless templates; every per-round subagent spawn in Tasks 8 and 9 substitutes placeholders and includes the running transcript. The templates are NOT sent to any persistent subagent — there is no persistent subagent in this architecture.
+The Moderator passes `GROUP_MODERATOR_PERSONA` (with substitutions) as the prompt to each of the 3 group-agent spawns in Step 3.4. The group-agents in turn substitute and pass `REVIEWER_PERSONA` and `AUTHOR_PERSONA` to their own nested `Agent` calls. These are all stateless templates; there is no persistent subagent anywhere in this architecture.
 
 ### Step 3.3: Initialize transcript and moderator-assessment buffer
 
@@ -825,60 +858,84 @@ Turn record shapes:
 
 Persist to disk after every lens completes (Task 11).
 
-### Step 3.4: Lens loop skeleton (with run-budget gate)
+### Step 3.4: Parallel group-agent dispatch
 
-Iterate `for lens in state.lens_plan where depth > 0` in `lens_id` order (0..8).
+**The Moderator does NOT iterate lenses.** It partitions the active lens plan into 3 groups of 3, dispatches all 3 group-agents in a **single assistant message** containing 3 concurrent `Agent` tool calls, buffers the JSON returns by `group_id`, then proceeds to Step 3.8 (merge).
 
-Every iteration begins with a **run-budget gate** (added 2026-04-22 evening, defined in T11 Step 3.8.5). If any of the three budgets is exceeded, the skill writes a partial briefing and terminates cleanly rather than hanging or silently overspending.
-
-For each lens:
-
-1. **Budget gate (T11 Step 3.8.5):** call `check_budgets_before_lens(lens)`. If it returns an abort, the skill writes a partial briefing via T13 with `partial=True` and exits — no further lenses run.
-2. **Compaction check (Task 10):** `running_ctx = maybe_compact(state.transcript)`. Log if compaction fires.
-3. **Run the per-lens debate:**
-   - `lens.lens_id == 7` → call `run_lens_7(lens, running_ctx)` (Task 9).
-   - otherwise → call `run_standard_lens(lens, running_ctx)` (Task 8).
-   Both return a `LensExchange` record: `{lens_id, turns_used, severity, moderator_signals: [...], transcript_slice: [...]}`.
-4. **Assign severity and persist (Task 11):** append the exchange to `state.lenses_completed`, extend `state.transcript` with the exchange's turns, dump `state.json` atomically.
-
-**Spawn wrapper.** Every `Agent(...)` call in Phase 3 (and the Phase 2a classification call in T4) must go through `spawn_agent(...)` (defined in T11 Step 3.8.5 — it increments `state.spawn_count` and adds the returned length to `state.moderator_own_context_est_chars` before returning the result). The wrapper exists so budget accounting cannot be forgotten at a call site.
-
-Pseudocode:
+**Group assignment.** Take `active = [l for l in state.lens_plan if l.depth > 0]` and partition by fixed lens_id bands:
 
 ```python
-# Outer lens loop (runs once per run)
-for lens in [l for l in state.lens_plan if l.depth > 0]:
-    check_budgets_before_lens(lens)                           # T11 Step 3.8.5 — may abort_run()
-    assert_hollow_run_invariants(state, lens)                 # Step 3.4.5 — GATE G-3a; may abort_run()
-    running_ctx = maybe_compact(state.transcript)             # Task 10
-    if lens.lens_id == 7:
-        exchange = run_lens_7(lens, running_ctx)              # Task 9 — uses spawn_agent
-    else:
-        exchange = run_standard_lens(lens, running_ctx)       # Task 8 — uses spawn_agent
-    persist_lens_exchange(exchange)                            # Task 11
+group_A = [l for l in active if l.lens_id in (0, 1, 2)]   # statistical / identification
+group_B = [l for l in active if l.lens_id in (3, 4, 5)]   # ML / generalization
+group_C = [l for l in active if l.lens_id in (6, 7, 8)]   # validity / positioning (lens 7 thematic)
 ```
 
-`check_budgets_before_lens` is the single enforcement point for the three hard-ceiling conditions (`spawn_budget`, `wall_clock_budget_s`, `MODERATOR_OWN_CONTEXT_SOFT_LIMIT_CHARS`). The per-round loops and the Moderator read/reasoning/decision logic live inside `run_standard_lens` (Task 8) and `run_lens_7` (Task 9). This task defines only the outer lens-iteration skeleton and the shared data structures.
+If a band is empty (e.g., user skipped all 3 lenses in one band via `--type`), the Moderator still dispatches a group-agent with `lens_ids_assigned = []`; that agent returns immediately with `lens_records = []` and `local_gate_results.g3a_local.passed = true`. This keeps the receive-3 invariant uniform.
 
-### Step 3.4.5: GATE G-3a — pre-lens hollow-run invariants
+**Budget partitioning.** Per-group budgets:
 
-`assert_hollow_run_invariants(state, lens)` runs immediately after `check_budgets_before_lens` at the top of each iteration. It catches hollow runs at the next lens boundary — the moment Moderator attempts to advance without having actually debated the prior lens.
+- `GROUP_SPAWN_BUDGET = 3 + sum(2 * l.depth for l in group)` (see Step 3.8.5 updated formula).
+- `GROUP_WALL_BUDGET_SECONDS = state.wall_clock_budget_s * 0.9 / 3` if we assume 90% of the remaining budget is spent in Phase 3 split roughly evenly; the 0.9 leaves headroom for merge + Phase 4/5.
 
-Predicate (all must hold; any `False` → `abort_run("hollow_run_detected", detail=<which>)`):
+**Dispatch (single assistant message, 3 concurrent Agent calls).** For each of the 3 groups, build the group_moderator.md prompt by substituting:
+
+- `PAPER_TITLE`, `PAPER_AUTHORS`, `PAPER_YEAR`, `DISPOSABLE_NOTEBOOK_ID`, `THEMATIC_NOTEBOOK_ID` (from `state`).
+- `GROUP_ID` (0 | 1 | 2), `GROUP_LENSES_JSON` (the 3-entry array; may be 0- or 2-entry if band is sparse), `OUT_ROOT`, `FULL_SLUG`.
+- `GROUP_SPAWN_BUDGET`, `GROUP_WALL_BUDGET_SECONDS`, `NOVELTY_CHECK_JSON` (for Group C only — the Moderator passes `null` to Groups A and B).
+
+Then issue the parallel dispatch via a single message with 3 `Agent` tool calls:
+
+```python
+# In a SINGLE assistant turn, emit three concurrent Agent tool calls.
+dispatches = [
+    Agent(subagent_type="general-purpose",
+          description=f"stress-test group {gid}",
+          prompt=group_prompt_for(gid, groups[gid])),
+    for gid in (0, 1, 2)
+]
+# No awaiting between calls. The runtime executes them concurrently.
+```
+
+Buffer returns into `group_returns[group_id]` as each arrives. Do NOT begin merge or Phase 4 until `len(group_returns) == 3`.
+
+**Parsing returns.** Each group return is parsed per **Parsing contract §8**. If parsing fails, re-dispatch that single group once (keep the other 2 returns). On second failure: record `state.groups[gid].status = "errored"`, abort to partial-mode briefing via Phase 5 with `partial=True`. The aggregate G-3a/G-3b gates at Step 3.8 will catch silent hollow returns regardless.
+
+**Budget enforcement at dispatch time.** Before the 3-way dispatch, the Moderator performs ONE budget gate against the aggregate ceiling:
+
+```python
+check_budgets_before_dispatch()   # checks spawn_budget, wall_clock_budget_s, moderator_own_context_est_chars
+```
+
+Per-lens budget checks happen INSIDE each group-agent (they wrap their own Reviewer/Author spawns). The Moderator no longer calls `check_budgets_before_lens` — there is no outer lens loop.
+
+**Spawn wrapper.** The Moderator's `spawn_agent(...)` wrapper (T11 Step 3.8.5) still wraps the 3 group-agent spawns and the Phase 2a classification call. Group-agents are responsible for counting their own internal spawns and returning `group_spawn_count`; the Moderator folds these into `state.spawn_count` at merge time (Step 3.8).
+
+**Resume behavior.** On resume, Step 3.4 first globs `${OUT_ROOT}/state/${FULL_SLUG}_group_*.json`. For each group, if the partial exists AND `len(lens_records) == len(lens_ids_assigned)` AND `aborted == false`, treat it as complete and skip dispatch. Dispatch only the missing/incomplete groups in a single message (1, 2, or 3 concurrent calls depending on what's missing).
+
+### Step 3.4.5: GATE G-3a — hollow-run invariants (local + aggregate)
+
+Under parallel dispatch, G-3a fires at **two levels** (defense-in-depth):
+
+**G-3a-local.** Runs inside each group-agent between its 3 lenses (see `agents/group_moderator.md` §Local gates). The group-agent checks, for every completed lens in its own group: `transcript_slice` length ≥ 3; `one_line_finding`, `author_best_defense`, `summary_for_compaction` non-empty; `group_spawn_count ≥ 1` after the first completed lens; `len(local_moderator_assessments) >= len(completed_lenses_in_group)`. On failure the group-agent sets `aborted=true`, writes its partial with whatever it has, and returns.
+
+**G-3a-aggregate.** Runs in the Moderator **after merging all 3 partial state files** at Step 3.8, before Phase 4 synthesis. Predicate (all must hold; any `False` → `abort_run("hollow_run_detected", detail=<which>)`):
 
 1. `state.wall_clock_start is not None` — Phase 3 start was reached.
-2. For every `prior ∈ state.lenses_completed`:
+2. `state.lenses_completed` is the union of the 3 groups' `lens_records` (no duplicates; all 9 distinct lens_ids present on normal completion).
+3. For every `prior ∈ state.lenses_completed`:
    - `prior.transcript_slice` has `length >= 3` (Reviewer initial + Author answer + terminal Reviewer at minimum).
    - `prior.one_line_finding`, `prior.author_best_defense`, `prior.summary_for_compaction` are all non-empty strings (not `None`, not `""`, not `"not provided"` when severity ≠ `"errored"`).
-3. If `lens.lens_id != 0` (i.e., this is not the first lens):
-   - `state.spawn_count >= 1` — Phase 2a classification alone should have produced at least one spawn.
-   - `len(state.moderator_assessments) >= len(state.lenses_completed)` — every completed lens must have contributed at least one moderator assessment entry per round.
+4. Aggregate spawn accounting:
+   - `state.spawn_count >= 3 + sum(l.group_spawn_count for l in group_returns)` — 3 group-agent dispatches plus every spawn they counted.
+   - `len(state.moderator_assessments) >= len(state.lenses_completed)` — every completed lens must have contributed at least one moderator assessment entry (these are the per-group local assessments, concatenated on merge).
 
-Abort behavior identical to Step 3.8.5's `abort_run`: writes partial briefing via Phase 5 with `partial=True`, persists `state.json`, terminates without Phase 4. The abort message names the exact invariant that failed so the user can diagnose which earlier lens was hollow. Resume via `--resume <slug>` rebuilds `running_ctx` and retries the offending lens.
+Abort behavior identical to Step 3.8.5's `abort_run`: writes partial briefing via Phase 5 with `partial=True`, persists `state.json`, terminates without Phase 4. The abort message names the exact invariant and the group_id(s) responsible so the user can diagnose which group produced hollow output. Resume via `--resume <slug>` re-dispatches the offending group(s); see §Resumability.
 
-**Rationale.** G-3a exists because the Moderator reading the skill may be tempted to advance to the next lens after writing a scaffold record — this gate makes that impossible. It fires at the latest one lens after the hollow behavior occurs.
+**Rationale.** G-3a-local catches the hollow-run pattern inside the group (the group-agent trying to advance without actually debating). G-3a-aggregate catches silent hollow returns from a group whose local gate was bypassed or corrupted, and also catches missing-lens errors (a group returning fewer records than assigned). Defense-in-depth is cheap: ~10 Python lines in `validate_state.py` and ~20 lines of prose here.
 
 ### Step 3.5: Standard lens debate (all lenses except 7)
+
+> **Execution context.** The per-lens debate loop described below now runs **inside each group-agent**, not in the top-level Moderator. The Moderator itself never calls `run_standard_lens` — the group-agent (`agents/group_moderator.md`) does. This section remains the canonical specification of the loop for group-agents to follow. References to "Moderator" in this step mean the group-agent acting as a local moderator for its assigned lenses.
 
 Function `run_standard_lens(lens, running_ctx)` — fresh `Agent` spawns per round, with a Moderator read-and-decide step after each (Reviewer, Author) exchange.
 
@@ -1041,6 +1098,8 @@ After the per-round loop ends, if `severity` is still unset:
 Used only when the terminal Reviewer turn omits or malforms its SEVERITY line.
 
 ### Step 3.6: Lens 7 triangulation (positioning vs. prior work)
+
+> **Execution context.** This loop runs **inside Group C's group-agent**, not in the top-level Moderator. The top-level Moderator passes the `THEMATIC_NOTEBOOK_ID` and (if available) the novelty-check top-3 as substitution variables into Group C's prompt. Group C executes the thematic query via `mcp__notebooklm__notebook_query` itself when it reaches lens 7. Group A and Group B never execute this step. References to "Moderator" below mean the Group C agent acting as a local moderator.
 
 Function `run_lens_7(lens, running_ctx)` — fresh `Agent` spawns per round with Moderator-driven thematic retrieval and three-source confrontation. Structure: **(Q1 + thematic query) → Author defense → Moderator read/decide → Confrontation Reviewer → Author final defense → Terminal Reviewer**. The Moderator's read-and-decide step runs after every (Reviewer, Author) exchange, same as in Task 8. Lens 7 is terminal by design — depth is fixed at 3 Author turns maximum regardless of the planned `lens.depth`.
 
@@ -1366,9 +1425,11 @@ The abort message (from T11 `abort_run`) points the user to resume via T18:
 
 On resume (T18), `state.moderator_own_context_est_chars` is **reset to 0** (new session = new Moderator context), and the resumed run continues from the first incomplete lens with a clean context budget. The wall-clock and spawn-count budgets are NOT reset by default (a runaway spawn loop should stay aborted even across a resume attempt), but may be raised by the user manually editing `state.spawn_budget` / `state.wall_clock_budget_s` before resume if the abort was legitimate-but-underbudgeted.
 
-### Step 3.8: Assign severity and persist state per lens
+### Step 3.8: Merge group partials, assign severity, persist canonical state
 
-For each completed `LensExchange` returned by Task 8 or 9:
+> **Execution split.** Under parallel dispatch, severity assignment and per-lens record composition (substeps 1–3 below) happen **inside each group-agent** for its 3 lenses, as part of building its partial state file. The top-level Moderator's job at this step is (A) parse the 3 Pattern-8 JSON returns, (B) load and merge the 3 partial state files, (C) re-run G-3b aggregate, (D) atomically write the canonical state.json.
+
+**Group-agent responsibilities (steps 1–3 below, performed 3 times inside each group-agent):** For each completed `LensExchange` the group-agent accumulates:
 
 1. **If the terminal Reviewer turn returned a `SEVERITY:` line** (parsed per **Parsing contract §2**): use that directly.
 
@@ -1402,21 +1463,20 @@ For each completed `LensExchange` returned by Task 8 or 9:
 
    Moderator generates `one_line_finding` and `summary_for_compaction` by reading the exchange — these are NOT asked of either subagent. `summary_for_compaction` is what T10's `summarize_exchange` function returns when this lens is later rolled into the compacted `running_ctx`; storing it at lens-close time avoids re-summarizing on every subsequent compaction.
 
-4. **Write state.json:** append the lens record to `state.lenses_completed[]`, then write the entire state.json file. Use atomic write: write to `<file>.tmp` then `mv`:
+4. **Group-agent writes its partial state file** (NOT the canonical state.json). Atomic: `<group_partial>.tmp` → `mv`:
 
    ```bash
-   cp state.json state.json.bak
-   <write new state to state.json.tmp>
-   mv state.json.tmp state.json
+   <write group state to ${FULL_SLUG}_group_${N}.json.tmp>
+   mv ${FULL_SLUG}_group_${N}.json.tmp ${FULL_SLUG}_group_${N}.json
    ```
 
-   If the write fails: retry once. Second failure → abort the whole run; the `.bak` preserves the last good state.
+   Schema: see `agents/group_moderator.md` §Partial state file schema. The canonical `state.json` is NEVER written from inside a group-agent.
 
-5. **User-visible progress message:**
+5. **Group-agent emits local user-visible progress** (optional, to the group-agent's own return notes, not shared across groups):
 
-   > Lens <N> (<name>) complete — severity: <severity>
+   > [group N] Lens <M> (<name>) complete — severity: <severity>
 
-6. **GATE G-3b — per-lens record validation.** Immediately after the atomic state write in step 4 (and before emitting the progress message in step 5), verify the just-appended record. All must hold:
+6. **GATE G-3b-local — per-lens record validation inside group-agent.** Immediately after writing the partial in step 4 and before moving to the next lens in the group, verify the just-added record in memory. All must hold:
 
    - All nine required keys are present: `lens_id`, `name`, `severity`, `one_line_finding`, `evidence`, `author_best_defense`, `summary_for_compaction`, `moderator_signals`, `transcript_slice`. Plus `why_it_didnt_hold` when `severity != "clean"`.
    - `severity ∈ {"critical", "major", "minor", "clean", "errored"}`.
@@ -1424,7 +1484,35 @@ For each completed `LensExchange` returned by Task 8 or 9:
    - `one_line_finding`, `author_best_defense`, `summary_for_compaction` are non-empty strings (not `None`, not `""`).
    - `moderator_signals` is a non-empty list.
 
-   If any check fails → `abort_run("lens_record_incomplete", detail=f"lens {lens_id} {name}: <which field>")`. The atomic write in step 4 means the bad record is already on disk; the partial briefing (Phase 5 with `partial=True`) will render what's there, and the abort message tells the user which lens to re-run via `--resume`.
+   If any check fails inside the group-agent: mark the record `severity = "errored"`, set `why_it_didnt_hold = "G-3b-local failure: <which field>"`, and continue to the next lens. The aggregate gate (below) will catch errored-dominant groups.
+
+---
+
+**Top-level Moderator responsibilities (merge + aggregate gates):**
+
+7. **Parse 3 Pattern-8 returns.** For each of the 3 group-agent results, apply Parsing contract §8. On parse failure, re-dispatch that single group once (Step 3.4). On second failure, record `state.groups[gid].status = "errored"` and proceed to Step 7.4 (partial briefing).
+
+8. **Merge partial state files.** Load each `${FULL_SLUG}_group_${N}.json` from disk; verify `group_id` matches the Pattern-8 payload (consistency). Concatenate `lens_records` from groups 0, 1, 2 in `lens_id` order (0..8) into `state.lenses_completed[]`. Concatenate `group_transcript` entries in group_id order into `state.transcript[]`. Concatenate `local_moderator_assessments` (from each partial) into `state.moderator_assessments[]`.
+
+9. **Fold spawn accounting.** `state.spawn_count = sum(g.group_spawn_count for g in returns) + 3` (+3 for the group-agent dispatches themselves).
+
+10. **Atomically write the canonical state.json.** Use `<file>.tmp` → `mv`:
+
+    ```bash
+    cp state.json state.json.bak         # if already exists
+    <write merged state to state.json.tmp>
+    mv state.json.tmp state.json
+    ```
+
+    On write failure: retry once. Second failure → abort; the `.bak` preserves last good state.
+
+11. **GATE G-3b-aggregate.** Re-run the per-record G-3b validation above against every record in `state.lenses_completed[]` after merge. Any failed record triggers `abort_run("lens_record_incomplete", detail=f"lens {lens_id} (group {origin_gid}): <which field>")` → Phase 5 with `partial=True`.
+
+12. **GATE G-3a-aggregate.** Run §Step 3.4.5 G-3a-aggregate predicate against merged state. On failure: `abort_run("hollow_run_detected", detail=<which>)` → Phase 5 with `partial=True`.
+
+13. **User-visible progress message:**
+
+    > All 3 groups returned. Merged 9 lens records. Severity distribution: <critical/major/minor/clean tally>.
 
 ### Step 3.8.5: Run budget and abort fields
 
@@ -1503,7 +1591,7 @@ All active lenses are complete. `state.lenses_completed[]` has one entry per act
 **GATE G-3c — end-of-Phase-3 integrity.** Before emitting "Phase 3 complete" and entering Phase 4, assert all four hold:
 
 1. `len(state.lenses_completed) == len([l for l in state.lens_plan if l.depth > 0])` — every active lens has a record.
-2. `state.spawn_count >= 2 * sum(l.depth for l in state.lens_plan if l.depth > 0)` — floor, not ceiling; each depth unit requires ≥1 Reviewer + ≥1 Author spawn. Lin 2021's `spawn_count: 0` fails this trivially.
+2. `state.spawn_count >= 3 + sum(2 * l.depth for l in state.lens_plan if l.depth > 0)` — floor, not ceiling; 3 group-agent dispatches plus each depth unit requiring ≥1 Reviewer + ≥1 Author spawn inside its owning group. Lin 2021's `spawn_count: 0` fails this trivially. Old formula (pre-parallel, sequential Reviewer): `spawn_count >= 2 * sum(l.depth ...)` — kept here for diffing against legacy state files.
 3. `len(state.moderator_assessments) >= len(state.lenses_completed)` — at least one moderator read/reasoning/decision entry per completed lens.
 4. `len(state.transcript) >= sum(len(l.transcript_slice) for l in state.lenses_completed)` — transcript contains every turn from every lens slice.
 
@@ -1869,40 +1957,51 @@ Output format: `GATE G-XY FAIL: lens <id> (<name>) <which field>` — one line p
 
 ## Resumability
 
-Every Phase 3 lens persists `state.json` (atomic write `.tmp` + `mv`) before advancing. If a run is interrupted (user aborts, subagent crashes, NotebookLM flake, machine restart), the next invocation on the same `<paper-ref>` the same day will see the existing `state.json` and offer:
+Under the **parallel 3×3 group-dispatch architecture**, resumability is **group-level, not per-lens**. Each group-agent writes its own `${FULL_SLUG}_group_${N}.json` partial state file atomically as it finishes each of its 3 lenses. The top-level Moderator merges partials into the canonical `state.json` only after all 3 groups return. If a run is interrupted, resume dispatches only the groups whose partial file is missing or incomplete.
+
+**Resume unit.** "Group N complete" or "Group N missing/incomplete" — per-lens-within-group resume is NOT supported. A partial group is re-run from scratch; its prior partial file is overwritten. This is a deliberate trade-off: group-agents complete in ~5–8 min, so re-running a partial group is cheaper than engineering mid-group checkpointing. **If you lose a 4-hour run to a crash during group C's lens 7, expect to re-run all three of group C's lenses, not just lens 7.**
+
+On resume the next invocation on the same `<paper-ref>` the same day sees the existing `state.json` and any `*_group_*.json` partials and offers:
 
 ```
 A stress-test with today's slug is already in progress:
-  {{FULL_SLUG}}_state.json (run_status: in_progress, lenses_completed: N of M)
+  {{FULL_SLUG}}_state.json (run_status: in_progress)
+  Partial groups on disk: [0: complete | 1: incomplete (2/3 lenses) | 2: missing]
 
 Choose:
-  [R] Resume from lens N+1 (reuses disposable + thematic notebooks, reuses novelty-check report)
-  [S] Start fresh (overwrites state; existing briefing untouched if already written)
+  [R] Resume (re-dispatch incomplete/missing groups: [1, 2]; reuse group 0's partial)
+  [S] Start fresh (overwrites state AND all partials; existing briefing untouched if already written)
   [A] Abort
 ```
 
 ### Resume behavior ([R])
 
-1. Load `state.json` fully. Under the transcript-relay architecture there are NO persistent subagents to re-attach; the only runtime state is (a) the Moderator's running transcript and (b) the per-lens records already in `state.lenses_completed`.
-2. **Clean up stale novelty-check state.** On resume, any background `runner_agent_id` from the prior session has long since expired (or notified and been missed). Do NOT attempt to collect from it. Apply the rule:
-   - If `state.novelty_check.status == "running"`: set `status = "timed_out"`, `completed_at = <ISO now>`, `raw_report_md = null`. Lens 7 (if not yet completed) will degrade accordingly. The stale `runner_agent_id` is preserved in the record only for debugging; never referenced operationally.
-   - If `status ∈ {"completed", "errored", "skipped", "timed_out"}`: keep as-is.
+1. Load `state.json` fully (it may be empty if no merge ever happened) and glob `${OUT_ROOT}/state/${FULL_SLUG}_group_*.json` to enumerate existing partials.
+2. **Clean up stale novelty-check state.** On resume, any background `runner_agent_id` from the prior session has long since expired. Apply:
+   - If `state.novelty_check.status == "running"`: set `status = "timed_out"`, `completed_at = <ISO now>`, `raw_report_md = null`.
+   - Otherwise: keep as-is.
 3. **Apply run-budget reset policy** (see Step 3.7.5 and Step 3.8.5):
-   - `state.moderator_own_context_est_chars` → **reset to 0** (new session = new Main-Claude context).
-   - `state.spawn_count` → **preserved** (do NOT reset; a runaway spawn loop should stay aborted across a resume).
-   - `state.wall_clock_start` → **preserved** (same rationale).
-   - `state.abort_reason` → **cleared to `null`** (the resumed run is no longer in an aborted state; if any budget is still exceeded on the very first `check_budgets_before_lens` call, it will re-abort).
-   - If the user wants to legitimately raise a budget before resuming (e.g., the spawn budget was set too low), they must edit `state.spawn_budget` / `state.wall_clock_budget_s` in `state.json` manually before invoking resume.
-4. Verify disposable notebook still exists via `mcp__notebooklm__notebook_list()` lookup. If it's been deleted externally, abort with error.
-5. Verify thematic notebook still exists (same check). If the thematic was resolved in the original run but has since been deleted, downgrade Lens 7's mode (if not yet completed) per the degradation table in Step 3.6.
-6. **Rebuild the running transcript, not the subagents.** Load `REVIEWER_PERSONA` and `AUTHOR_PERSONA` from disk (Step 3.2). Set `state.transcript` as-is from the file; set `running_ctx = maybe_compact(state.transcript)` (Step 3.7) to get the compacted context used for the next lens's first round. No subagent spawn happens at resume — the next per-round spawn in Phase 3 behaves normally.
-7. Jump to Phase 3 lens loop starting at the first `lens_plan` entry whose `lens_id` is NOT in `state.lenses_completed`. The lens-loop top immediately calls `check_budgets_before_lens(lens)` — if any preserved budget is still exceeded, the resume immediately re-aborts with the same reason (the intended behavior for runaway-loop aborts).
-8. Continue to Phases 4, 5, 6 normally.
-9. Record the resume event in `state.compaction_history` (the only history field that survives the 2026-04-22 architecture amendment):
+   - `state.moderator_own_context_est_chars` → **reset to 0** (new session).
+   - `state.spawn_count` → **preserved** (runaway spawn loops should stay aborted across resume).
+   - `state.wall_clock_start` → **preserved**.
+   - `state.abort_reason` → **cleared to `null`**.
+   - To raise a budget: edit `state.spawn_budget` / `state.wall_clock_budget_s` manually before resume.
+4. Verify disposable and thematic notebooks still exist via `mcp__notebooklm__notebook_list()`. If missing: abort with error.
+5. **Classify each group's partial:**
+   - **Complete:** partial exists, parses, has `len(lens_records) == len(lens_ids_assigned)`, `aborted == false`. Treat group as done; skip re-dispatch.
+   - **Incomplete:** partial exists but has fewer records than assigned, OR `aborted == true`. Mark for re-dispatch; existing partial will be overwritten.
+   - **Missing:** no partial file. Mark for re-dispatch.
+6. Load `REVIEWER_PERSONA`, `AUTHOR_PERSONA`, `GROUP_MODERATOR_PERSONA` from disk (Step 3.2).
+7. **Re-dispatch only incomplete/missing groups.** Build the group_moderator prompt for each re-dispatched group (same substitutions as a fresh run). Issue them in a single assistant message containing 1–3 concurrent `Agent` tool_use blocks (Step 3.4 parallel dispatch). Groups marked complete are NOT re-dispatched.
+8. **Merge.** After all re-dispatched groups return, follow Step 3.8 merge protocol (load all 3 partials — including the ones carried over from the prior session — into the canonical `state.json`). Run G-3a-aggregate and G-3b-aggregate.
+9. Continue to Phases 4, 5, 6 normally.
+10. Record the resume event in `state.compaction_history`:
 
-   ```json
-   {"at_lens": <next_lens_id>, "reason": "session resume", "before_size": <transcript_char_count>, "after_size": <running_ctx_char_count>, "lenses_collapsed": [<ids collapsed by maybe_compact>], "timestamp": "<ISO 8601>"}
-   ```
+    ```json
+    {"at_group_resume": <true>, "re_dispatched_groups": [<gid>, ...], "reason": "session resume", "timestamp": "<ISO 8601>"}
+    ```
+
+**Non-determinism warning.** Re-dispatched groups produce fresh debate transcripts, not literal replays of their prior attempt. Severity assignments may shift by 1 bucket due to LLM noise. Group partials that were classified as "complete" in step 5 are preserved verbatim, so their outputs remain stable across resume.
 
 ### Start fresh ([S])
 
