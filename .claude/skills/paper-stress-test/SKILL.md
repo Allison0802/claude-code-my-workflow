@@ -714,7 +714,699 @@ State.json now contains:
 - Empty `transcript`, `moderator_assessments`, `compaction_history` — all populated during Phase 3.
 
 No subagent handles are persisted; the Phase 2a classification call was one-shot, and Phase 3 spawns fresh Reviewer and Author subagents per round (see §Architecture Amendment).
-<!-- Phase 3 instructions added in Tasks 7, 8, 9, 10, 11 -->
+## Phase 3 — Adversarial debate loop
+
+### Step 3.1: First novelty-check collection point (non-blocking)
+
+This is the **first of two novelty-check check points** (T5 Step 2.6). Do NOT poll, sleep, or wait for the runner agent — per the harness convention, completion arrives as an asynchronous notification surfaced in the Moderator's context.
+
+Check, in this order:
+
+1. Has a background-agent completion notification for `state.novelty_check.runner_agent_id` arrived in the conversation so far? If YES: parse the runner's output per Parsing contract §7, update `state.novelty_check` to `status="completed"` with the parsed fields, `completed_at = now`. Continue Phase 3.
+2. If NO notification yet: compute `elapsed = now - state.novelty_check.started_at`.
+   - If `elapsed > NOVELTY_CHECK_TIMEOUT_SECONDS` (300): set `status = "timed_out"`, `completed_at = now`, `raw_report_md = null`. Continue. The runner will complete later on its own; its late output is discarded.
+   - Otherwise: leave `status = "running"`. Continue Phase 3 immediately — Lens 7 will re-check at its start (T9 Step 9.1.1 in the amended layout).
+
+No sleep, no polling. The second check point at Lens 7 catches results that arrive between this point and Lens 7.
+
+### Step 3.2: Load persona templates once
+
+Read both persona files with the `Read` tool and keep them in Moderator memory:
+
+```
+REVIEWER_PERSONA = Read(".claude/skills/paper-stress-test/agents/reviewer.md")
+AUTHOR_PERSONA   = Read(".claude/skills/paper-stress-test/agents/author.md")
+```
+
+These are stateless templates; every per-round subagent spawn in Tasks 8 and 9 substitutes placeholders and includes the running transcript. The templates are NOT sent to any persistent subagent — there is no persistent subagent in this architecture.
+
+### Step 3.3: Initialize transcript and moderator-assessment buffer
+
+```
+state.transcript              = []     # array of turn records (reviewer | author | moderator)
+state.compaction_history      = []     # populated by Task 10 when threshold crossed
+state.moderator_assessments   = []     # flat index of all moderator entries, for Phase 4 synthesis
+```
+
+Turn record shapes:
+
+```json
+// Reviewer turn
+{"lens_id": N, "role": "reviewer", "round": R, "text": "...", "parsed": {...}, "terminal": false, "timestamp": "..."}
+
+// Author turn
+{"lens_id": N, "role": "author",   "round": R, "text": "...", "citations": [...], "timestamp": "..."}
+
+// Moderator per-round entry (see §Moderator transcript entry schema in Architecture Amendment)
+{"lens_id": N, "role": "moderator","round": R,
+ "reasoning": "...", "signal": "progressing|stalling|converging",
+ "decision":  "continue|inject_steer|close_lens", "steer": "..." | null,
+ "timestamp": "..."}
+```
+
+Persist to disk after every lens completes (Task 11).
+
+### Step 3.4: Lens loop skeleton (with run-budget gate)
+
+Iterate `for lens in state.lens_plan where depth > 0` in `lens_id` order (0..8).
+
+Every iteration begins with a **run-budget gate** (added 2026-04-22 evening, defined in T11 Step 3.8.5). If any of the three budgets is exceeded, the skill writes a partial briefing and terminates cleanly rather than hanging or silently overspending.
+
+For each lens:
+
+1. **Budget gate (T11 Step 3.8.5):** call `check_budgets_before_lens(lens)`. If it returns an abort, the skill writes a partial briefing via T13 with `partial=True` and exits — no further lenses run.
+2. **Compaction check (Task 10):** `running_ctx = maybe_compact(state.transcript)`. Log if compaction fires.
+3. **Run the per-lens debate:**
+   - `lens.lens_id == 7` → call `run_lens_7(lens, running_ctx)` (Task 9).
+   - otherwise → call `run_standard_lens(lens, running_ctx)` (Task 8).
+   Both return a `LensExchange` record: `{lens_id, turns_used, severity, moderator_signals: [...], transcript_slice: [...]}`.
+4. **Assign severity and persist (Task 11):** append the exchange to `state.lenses_completed`, extend `state.transcript` with the exchange's turns, dump `state.json` atomically.
+
+**Spawn wrapper.** Every `Agent(...)` call in Phase 3 (and the Phase 2a classification call in T4) must go through `spawn_agent(...)` (defined in T11 Step 3.8.5 — it increments `state.spawn_count` and adds the returned length to `state.moderator_own_context_est_chars` before returning the result). The wrapper exists so budget accounting cannot be forgotten at a call site.
+
+Pseudocode:
+
+```python
+# Outer lens loop (runs once per run)
+for lens in [l for l in state.lens_plan if l.depth > 0]:
+    check_budgets_before_lens(lens)                           # T11 Step 3.8.5 — may abort_run()
+    running_ctx = maybe_compact(state.transcript)             # Task 10
+    if lens.lens_id == 7:
+        exchange = run_lens_7(lens, running_ctx)              # Task 9 — uses spawn_agent
+    else:
+        exchange = run_standard_lens(lens, running_ctx)       # Task 8 — uses spawn_agent
+    persist_lens_exchange(exchange)                            # Task 11
+```
+
+`check_budgets_before_lens` is the single enforcement point for the three hard-ceiling conditions (`spawn_budget`, `wall_clock_budget_s`, `MODERATOR_OWN_CONTEXT_SOFT_LIMIT_CHARS`). The per-round loops and the Moderator read/reasoning/decision logic live inside `run_standard_lens` (Task 8) and `run_lens_7` (Task 9). This task defines only the outer lens-iteration skeleton and the shared data structures.
+
+### Step 3.5: Standard lens debate (all lenses except 7)
+
+Function `run_standard_lens(lens, running_ctx)` — fresh `Agent` spawns per round, with a Moderator read-and-decide step after each (Reviewer, Author) exchange.
+
+Local state inside the function:
+
+```
+lens_transcript       = []      # this lens's turns only; appended to state.transcript at end
+latest_moderator_entry = None   # feeds the next round's Reviewer prompt
+severity              = None    # set when the lens resolves
+```
+
+Per-round loop (`for round in 1..lens.depth`):
+
+**1. Build and spawn fresh Reviewer (Opus).**
+
+```
+reviewer_prompt = build_reviewer_prompt(
+    persona         = REVIEWER_PERSONA,
+    paper_context   = state.paper,             # title/authors/year
+    notebook_ids    = {
+        "disposable": state.notebooks.disposable.id,
+        "thematic":   state.notebooks.thematic.id,   # read-only for Lens 7 only
+    },
+    lens            = lens,                    # lens_id, name, description, depth
+    round           = round,
+    transcript      = running_ctx + lens_transcript,
+    moderator_steer = (latest_moderator_entry.steer
+                       if latest_moderator_entry and
+                          latest_moderator_entry.decision == "inject_steer"
+                       else None),
+    close_lens_mode = (latest_moderator_entry is not None and
+                       latest_moderator_entry.decision == "close_lens"),
+)
+
+reviewer_text = Agent(
+    description       = "paper-stress-test reviewer (round " + round + ")",
+    subagent_type     = "general-purpose",
+    model             = "opus",
+    prompt            = reviewer_prompt,
+    run_in_background = False,
+)
+```
+
+Parse `reviewer_text` per **Parsing contract** — which subsection depends on round:
+
+- `round == 1` AND no prior Moderator `close_lens` → Parsing contract §1 (Format A: Primary question).
+- `round > 1` AND not `close_lens_mode` → Parsing contract §2 (Format B: Judgment + decision, may be FOLLOWUP or FINAL).
+- `close_lens_mode == True` → Parsing contract §2 Format B, FINAL only (Reviewer is instructed in the prompt to emit no new question).
+
+Append to `lens_transcript`:
+
+```json
+{"lens_id": lens.lens_id, "role": "reviewer", "round": round,
+ "text": reviewer_text, "parsed": <parsed fields>,
+ "terminal": <true if FINAL or close_lens_mode>, "timestamp": "..."}
+```
+
+**2. Early exit if Reviewer returned FINAL.**
+
+If `parsed.next == "FINAL"` OR `close_lens_mode == True`:
+
+- `severity = parsed.severity` (use Severity-from-judgment fallback table below if missing).
+- Skip Author turn; skip Moderator assessment.
+- Break out of the per-round loop.
+
+**3. Build and spawn fresh Author (Sonnet).**
+
+```
+author_prompt = build_author_prompt(
+    persona           = AUTHOR_PERSONA,
+    paper_context     = state.paper,
+    disposable_nb_id  = state.notebooks.disposable.id,
+    transcript        = running_ctx + lens_transcript,
+    reviewer_question = parsed.question_or_followup,
+)
+
+author_text = Agent(
+    description       = "paper-stress-test author (lens " + lens.lens_id + ", round " + round + ")",
+    subagent_type     = "general-purpose",
+    model             = "sonnet",
+    prompt            = author_prompt,
+    run_in_background = False,
+)
+```
+
+Parse `author_text` per **Parsing contract §5 (Author answer turn)**. Append:
+
+```json
+{"lens_id": lens.lens_id, "role": "author", "round": round,
+ "text": author_text, "citations": <extracted>, "timestamp": "..."}
+```
+
+**4. Moderator read / reason / decide (NEW — required by amendment).**
+
+The Moderator (main Claude) performs these four actions in-context. No subagent spawn.
+
+a. **Read** the round's two new turns (`lens_transcript[-2:]`) in the context of the full `lens_transcript` so far.
+
+b. **Write reasoning paragraph** (2–5 sentences): what the Reviewer probed, what the Author cited or conceded, whether substance was advanced. Be plain and specific; avoid hedged summaries.
+
+c. **Classify the debate state** as exactly one of `progressing | stalling | converging` per the definitions in §Per-round Moderator behavior of the Architecture Amendment.
+
+d. **Choose a decision** as exactly one of:
+
+- `continue` — transcript alone is steer enough; the next Reviewer spawn will build its own follow-up. Typical for `progressing`.
+- `inject_steer` — craft a **single sentence** in field `steer` that will be prepended to the next round's Reviewer prompt as `## Moderator directive for this round`. Use when `stalling` (pivot to a new angle) or when `progressing` is drifting off-lens (re-anchor).
+- `close_lens` — cut the lens off next round. Set `severity` on the subsequent terminal Reviewer turn. Use when `converging`, or when the remaining depth budget cannot plausibly add information.
+
+Append the Moderator entry:
+
+```json
+{"lens_id": lens.lens_id, "role": "moderator", "round": round,
+ "reasoning": "<paragraph>",
+ "signal":    "progressing|stalling|converging",
+ "decision":  "continue|inject_steer|close_lens",
+ "steer":     "<one sentence>" | null,
+ "timestamp": "..."}
+```
+
+Also append to `state.moderator_assessments` (flat index, used by Phase 4 synthesis).
+
+Set `latest_moderator_entry = <the entry just appended>`.
+
+**5. Act on `close_lens` decision.**
+
+If `latest_moderator_entry.decision == "close_lens"` and there is remaining depth (`round < lens.depth`):
+
+- Advance to the next round, which the per-round loop's top-of-iteration logic will run in `close_lens_mode` (the Reviewer prompt will forbid new questions and demand FINAL). Severity is set from that terminal Reviewer turn.
+
+If the decision is `close_lens` but `round == lens.depth` (no depth left), force severity now: spawn one more Reviewer with `close_lens_mode=True` (ignoring depth exhaustion — this is the terminal turn), parse SEVERITY, append as `terminal: true`, break.
+
+**6. Post-loop: force FINAL if depth ran out without resolution.**
+
+After the per-round loop ends, if `severity` is still unset:
+
+- Spawn one terminal Reviewer with `close_lens_mode=True` and depth-exhausted phrasing in the prompt.
+- Parse SEVERITY; if missing or malformed, fall back to the Severity-from-judgment mapping below.
+
+**7. Return `LensExchange` record.**
+
+```json
+{
+  "lens_id":          lens.lens_id,
+  "turns_used":       <count of Author turns in lens_transcript>,
+  "severity":         <final severity>,
+  "moderator_signals":[<signal-by-round array: "progressing","stalling",...>],
+  "transcript_slice": <lens_transcript>
+}
+```
+
+### Severity-from-judgment fallback (if Reviewer's SEVERITY is missing)
+
+| Final judgment | Severity |
+|----------------|----------|
+| `cited`        | `clean`  |
+| `handwaved`    | `minor`  |
+| `evaded`       | `major`  |
+| `conceded`     | `critical` |
+
+Used only when the terminal Reviewer turn omits or malforms its SEVERITY line.
+
+### Step 3.6: Lens 7 triangulation (positioning vs. prior work)
+
+Function `run_lens_7(lens, running_ctx)` — fresh `Agent` spawns per round with Moderator-driven thematic retrieval and three-source confrontation. Structure: **(Q1 + thematic query) → Author defense → Moderator read/decide → Confrontation Reviewer → Author final defense → Terminal Reviewer**. The Moderator's read-and-decide step runs after every (Reviewer, Author) exchange, same as in Task 8. Lens 7 is terminal by design — depth is fixed at 3 Author turns maximum regardless of the planned `lens.depth`.
+
+Lens 7 differs from the standard lens in THREE ways:
+
+1. The first Reviewer prompt embeds the novelty-check summary INLINE (no separate seeding step).
+2. The first Reviewer reply emits **both** `QUESTION` and `THEMATIC_QUERY` (Parsing contract §3). The Moderator — not the Reviewer — runs the thematic `notebook_query`.
+3. The confrontation-round Reviewer prompt receives THREE sources: Author's Q1 defense + thematic evidence + novelty-check top-3 (Parsing contract §4).
+
+Local state inside the function:
+
+```
+lens_transcript        = []
+latest_moderator_entry = None
+severity               = None
+```
+
+**Step 9.1.1: Late-arrival novelty-check re-collection.**
+
+If `state.novelty_check.status == "running"`, re-check the notification queue exactly as in Step 3.1 once more — this is the second of the two collection points. Update `state.novelty_check` accordingly. Do not poll or sleep.
+
+**Step 9.1.2: Build the novelty-seed block (one of four forms).**
+
+```
+if state.novelty_check.status == "completed":
+    novelty_seed = (
+        "## novelty-check report summary\n\n"
+        "Overall score: " + state.novelty_check.overall_score + "/10\n"
+        "Recommendation: " + state.novelty_check.recommendation + "\n"
+        "Key differentiator: " + state.novelty_check.key_differentiator + "\n\n"
+        "## Closest prior work (top 3)\n\n" + format_top3(state.novelty_check.closest_prior_work)
+    )
+elif state.novelty_check.status in {"errored", "timed_out", "skipped"}:
+    novelty_seed = "## novelty-check: " + state.novelty_check.status + " — no external data available for this lens"
+else:
+    novelty_seed = "## novelty-check: still running at Lens 7 start — treat as unavailable"
+```
+
+**Step 9.1.3: Round 1 — Reviewer Q1 + thematic query.**
+
+Build the first Reviewer prompt. Unlike a standard lens, the prompt contains the `novelty_seed` inline:
+
+```
+reviewer_prompt_r1 = build_lens7_reviewer_prompt(
+    persona        = REVIEWER_PERSONA,
+    paper_context  = state.paper,
+    notebook_ids   = {"disposable": state.notebooks.disposable.id,
+                      "thematic":   state.notebooks.thematic.id},
+    lens           = lens,
+    round          = 1,
+    transcript     = running_ctx,
+    novelty_seed   = novelty_seed,
+    # Reviewer persona's Format C (initial Lens 7 turn) expects both outputs:
+    require_output = "QUESTION + THEMATIC_QUERY",
+)
+
+reviewer_text_r1 = Agent(
+    description="paper-stress-test reviewer (lens 7, round 1)",
+    subagent_type="general-purpose", model="opus",
+    prompt=reviewer_prompt_r1, run_in_background=False,
+)
+
+parsed_r1 = parse per Parsing contract §3   # extracts QUESTION and THEMATIC_QUERY
+lens_transcript.append({"lens_id": 7, "role": "reviewer", "round": 1,
+                        "text": reviewer_text_r1, "parsed": parsed_r1, "timestamp": now()})
+```
+
+**Step 9.1.4: Moderator queries the thematic notebook.**
+
+```
+if state.notebooks.thematic.id is not None and parsed_r1.thematic_query:
+    thematic_evidence = mcp__notebooklm__notebook_query(
+        notebook_id=state.notebooks.thematic.id,
+        query=parsed_r1.thematic_query,
+    )
+else:
+    thematic_evidence = None   # thematic was not resolved in Phase 1 (user chose [5])
+```
+
+**Step 9.1.5: Author defense for Q1.**
+
+```
+author_prompt_r1 = build_author_prompt(
+    persona           = AUTHOR_PERSONA,
+    paper_context     = state.paper,
+    disposable_nb_id  = state.notebooks.disposable.id,
+    transcript        = running_ctx + lens_transcript,
+    reviewer_question = parsed_r1.question,
+)
+
+author_text_r1 = Agent(
+    description="paper-stress-test author (lens 7, round 1)",
+    subagent_type="general-purpose", model="sonnet",
+    prompt=author_prompt_r1, run_in_background=False,
+)
+
+lens_transcript.append({"lens_id": 7, "role": "author", "round": 1,
+                        "text": author_text_r1,
+                        "citations": extract_citations(author_text_r1),
+                        "timestamp": now()})
+```
+
+**Step 9.1.6: Moderator read / reason / decide after round 1.** Identical behavior to Task 8 Step 4; append moderator entry to `lens_transcript` and `state.moderator_assessments`. Set `latest_moderator_entry`.
+
+If `latest_moderator_entry.decision == "close_lens"`: skip directly to Step 9.1.9 (terminal Reviewer) with `close_lens_mode=True`.
+
+**Step 9.1.7: Round 2 — Confrontation Reviewer (three-source).**
+
+Build a confrontation prompt that stacks three sources. Respect the degradation table below if any source is missing.
+
+```
+confrontation_prompt = build_lens7_confrontation_prompt(
+    persona           = REVIEWER_PERSONA,
+    paper_context     = state.paper,
+    lens              = lens,
+    round             = 2,
+    transcript        = running_ctx + lens_transcript,
+    author_defense    = author_text_r1,
+    thematic_evidence = thematic_evidence,            # may be None
+    novelty_top3      = state.novelty_check.closest_prior_work[:3]
+                         if state.novelty_check.status == "completed" else None,
+    moderator_steer   = (latest_moderator_entry.steer
+                         if latest_moderator_entry.decision == "inject_steer"
+                         else None),
+    # Reviewer emits Format C (confrontation turn): CONFRONTATION OR JUDGMENT:cited/SEVERITY:clean
+    require_output    = "CONFRONTATION or JUDGMENT+SEVERITY",
+)
+
+confrontation_text = Agent(
+    description="paper-stress-test reviewer (lens 7, round 2, confrontation)",
+    subagent_type="general-purpose", model="opus",
+    prompt=confrontation_prompt, run_in_background=False,
+)
+
+parsed_r2 = parse per Parsing contract §4
+lens_transcript.append({"lens_id": 7, "role": "reviewer", "round": 2,
+                        "text": confrontation_text, "parsed": parsed_r2, "timestamp": now()})
+```
+
+**Step 9.1.8: Branch on confrontation output.**
+
+If `parsed_r2` is `JUDGMENT: cited + SEVERITY: clean` (Author already differentiated): set `severity = "clean"`, mark that reviewer turn `terminal: true`, jump to Step 9.1.10.
+
+If `parsed_r2.confrontation` is present: proceed to Author's final defense.
+
+```
+author_prompt_r2 = build_author_prompt(
+    persona           = AUTHOR_PERSONA,
+    paper_context     = state.paper,
+    disposable_nb_id  = state.notebooks.disposable.id,
+    transcript        = running_ctx + lens_transcript,
+    reviewer_question = parsed_r2.confrontation,
+)
+
+author_text_r2 = Agent(
+    description="paper-stress-test author (lens 7, round 2, rebuttal)",
+    subagent_type="general-purpose", model="sonnet",
+    prompt=author_prompt_r2, run_in_background=False,
+)
+
+lens_transcript.append({"lens_id": 7, "role": "author", "round": 2,
+                        "text": author_text_r2,
+                        "citations": extract_citations(author_text_r2),
+                        "timestamp": now()})
+```
+
+**Step 9.1.9: Moderator read / reason / decide after round 2.** Same four-step pattern as Task 8 Step 4. Append moderator entry. Set `latest_moderator_entry`.
+
+**Step 9.1.10: Terminal Reviewer (round 3).**
+
+Spawn the terminal Reviewer with `close_lens_mode=True`. No further Author turn.
+
+```
+terminal_prompt = build_reviewer_prompt(
+    persona         = REVIEWER_PERSONA,
+    paper_context   = state.paper,
+    notebook_ids    = {...},
+    lens            = lens,
+    round           = 3,
+    transcript      = running_ctx + lens_transcript,
+    moderator_steer = (latest_moderator_entry.steer
+                       if latest_moderator_entry and latest_moderator_entry.decision == "inject_steer"
+                       else None),
+    close_lens_mode = True,     # forces Format B, FINAL only — JUDGMENT + SEVERITY
+)
+
+terminal_text = Agent(
+    description="paper-stress-test reviewer (lens 7, round 3, terminal)",
+    subagent_type="general-purpose", model="opus",
+    prompt=terminal_prompt, run_in_background=False,
+)
+
+parsed_terminal = parse per Parsing contract §2
+severity = parsed_terminal.severity or severity_from_judgment(parsed_terminal.judgment)
+lens_transcript.append({"lens_id": 7, "role": "reviewer", "round": 3,
+                        "text": terminal_text, "parsed": parsed_terminal,
+                        "terminal": True, "timestamp": now()})
+```
+
+**Step 9.1.11: Return `LensExchange` record.**
+
+```json
+{
+  "lens_id":           7,
+  "turns_used":        <count of Author turns>,
+  "severity":          <final severity>,
+  "moderator_signals": [<signals by round>],
+  "thematic_evidence_ref": {"used": <bool>, "notebook_id": ...},
+  "transcript_slice":  <lens_transcript>
+}
+```
+
+### Lens 7 degradation rules
+
+| novelty-check status | thematic notebook | Sources at confrontation | Behavior |
+|----------------------|-------------------|--------------------------|----------|
+| completed            | resolved          | 3 (Author defense + thematic + novelty top-3) | Full triangulation as above. |
+| completed            | null              | 2 (Author defense + novelty top-3)            | Skip Steps 9.1.3 `THEMATIC_QUERY`, 9.1.4 notebook_query; confrontation uses novelty top-3 only. Flag `thematic_evidence=None` in the LensExchange. |
+| errored / timed_out / skipped | resolved | 2 (Author defense + thematic)                  | Set `novelty_seed` to its "unavailable" form; confrontation uses thematic only. |
+| errored / timed_out / skipped | null    | 1 (Author defense only)                        | Lens 7 degrades to a standard lens run (call `run_standard_lens(lens, running_ctx)` and append a caveat `single_source=true` to the LensExchange). |
+
+In the last row, the Moderator's read/reason/decide still applies per Task 8; the LensExchange's `single_source` flag is rendered in the briefing as a caveat.
+
+### Step 3.7: Transcript compaction
+
+Before each new lens (after a compaction check in Step 3.4), the Moderator examines the running transcript and compacts it if it has grown past `COMPACTION_THRESHOLD`. The returned `running_ctx` is what gets embedded in the next lens's Reviewer and Author prompts.
+
+#### Constants
+
+- `COMPACTION_THRESHOLD_CHARS = 80000` — default ~20K tokens at the char/4 heuristic.
+- `MIN_LENSES_COMPACTED = 1` — never compact zero lenses; if only the current lens exists, skip compaction.
+
+#### Function: `maybe_compact(transcript) -> running_ctx`
+
+```
+def maybe_compact(transcript):
+    serialized = serialize_transcript(transcript)         # JSON Lines or similar plain text
+    if len(serialized) < COMPACTION_THRESHOLD_CHARS:
+        return transcript   # nothing to do
+
+    completed_lens_ids = sorted({t["lens_id"] for t in transcript if t.get("terminal", False)})
+    if len(completed_lens_ids) < MIN_LENSES_COMPACTED:
+        return transcript   # don't compact the very first lens
+
+    # 1. Summarize each completed lens to 1–2 sentences
+    summary_bullets = []
+    for lid in completed_lens_ids:
+        lens_slice = [t for t in transcript if t["lens_id"] == lid]
+        lens_meta  = find_lens_meta(lid)                  # name + description
+        severity   = find_severity(lid)                   # from state.lenses_completed
+        decisive   = find_decisive_exchange(lens_slice)   # last Reviewer judgment + Author cited passage, or the close_lens trigger
+
+        summary_bullets.append(
+            f"- Lens {lid} ({lens_meta.name}) — severity: {severity}. "
+            f"Decisive exchange: {summarize_exchange(decisive, max_sentences=2)}"
+        )
+
+    # 2. Keep the current (in-flight or unresolved) lens verbatim
+    current_lens_turns = [t for t in transcript if t["lens_id"] not in completed_lens_ids]
+
+    # 3. Build running_ctx: header + bullets + current-lens verbatim
+    running_ctx = [
+        {"role": "moderator_note",
+         "text": "## Transcript compaction applied — " + str(len(completed_lens_ids)) +
+                 " completed lenses summarized below; current lens retained verbatim."},
+        {"role": "moderator_summary",
+         "text": "\n".join(summary_bullets)},
+    ] + current_lens_turns
+
+    # 4. Record the compaction event
+    state.compaction_history.append({
+        "at_lens":     current_lens_turns[0]["lens_id"] if current_lens_turns else None,
+        "before_size": len(serialized),
+        "after_size":  len(serialize_transcript(running_ctx)),
+        "lenses_collapsed": completed_lens_ids,
+        "timestamp":   now_iso(),
+    })
+
+    # 5. User-visible log
+    emit_user_message(
+        f"Compacting transcript at lens "
+        f"{current_lens_turns[0]['lens_id'] if current_lens_turns else '(none)'}"
+        f" — {len(completed_lens_ids)} previous lens(es) summarized, current lens retained verbatim."
+    )
+
+    return running_ctx
+```
+
+**Note on invariants:**
+
+- `state.transcript` is NEVER mutated by compaction. The full transcript is preserved on disk for the final briefing (Task 13). `maybe_compact` only builds a compacted `running_ctx` to hand into the *next* lens's subagent prompts.
+- Compaction fires before a new lens, never mid-lens. The in-flight lens's rounds always see full verbatim history of that lens.
+- Moderator per-round entries (role: `moderator`) from completed lenses are rolled into the summary bullets by `summarize_exchange` (they are not retained verbatim). Moderator entries from the current lens are kept verbatim.
+
+### Step 3.7.5: Moderator own-context soft budget
+
+Transcript compaction shrinks the prompts that are sent INTO fresh subagent spawns. It does not shrink Main Claude's own conversation context, which accumulates every `Agent` tool result across ~50–65 per-run spawns. After a long run the Moderator's own context window can approach its ceiling independently of whatever compaction did for the subagents.
+
+This is a distinct concern from `maybe_compact(transcript)` and is handled separately here.
+
+#### Constants
+
+- `MODERATOR_OWN_CONTEXT_SOFT_LIMIT_CHARS = 1600000` — default ~400K tokens at the char/4 heuristic. This is a soft limit: on hitting it we do not try to rescue the run mid-lens; we save state, write a partial briefing, and instruct the user to resume.
+- `MODERATOR_OWN_CONTEXT_PAD_FRAC = 0.2` — buffer fraction reserved for the partial-briefing + cleanup steps after abort (so that crossing the soft limit doesn't prevent us from saving safely).
+
+#### Tracked estimator
+
+`state.moderator_own_context_est_chars` accumulates the length of every `Agent` tool result the Moderator has received during this run. The `spawn_agent` wrapper (defined in T11 Step 3.8.5) increments this field on every spawn; no other increment site exists.
+
+The estimate is intentionally coarse. It undercounts (conversation metadata, Moderator's own output tokens, NotebookLM tool results are not included) but is monotone and cheap to compute. The soft limit is set low enough that a 10–20% undercount still leaves headroom before the harness's own ceiling.
+
+#### Enforcement
+
+Enforcement happens at the **top of each lens iteration**, folded into `check_budgets_before_lens(lens)` (T11 Step 3.8.5). If `state.moderator_own_context_est_chars >= MODERATOR_OWN_CONTEXT_SOFT_LIMIT_CHARS`, `check_budgets_before_lens` calls `abort_run(reason="moderator_context_exceeded", …)`, which writes a partial briefing and terminates cleanly.
+
+**Why check only at lens boundaries, not mid-lens?** Because aborting mid-lens leaves a half-debated lens with no severity, and the extra ~3–6 spawns to finish a lens once started are bounded. The soft limit is sized generously enough that finishing the in-flight lens after a budget crossing is safe.
+
+#### User-facing instruction on abort
+
+The abort message (from T11 `abort_run`) points the user to resume via T18:
+
+> ⚠️ Paper stress-test aborted — moderator_context_exceeded. Moderator context at <N> chars (≈<N/4> tokens) ≥ soft limit <L>. Partial briefing at `<path>`. Resume with the skill's `--resume <slug>` option; the resumed Moderator starts with a fresh context and rebuilds `running_ctx` from `state.transcript` via `maybe_compact()`.
+
+On resume (T18), `state.moderator_own_context_est_chars` is **reset to 0** (new session = new Moderator context), and the resumed run continues from the first incomplete lens with a clean context budget. The wall-clock and spawn-count budgets are NOT reset by default (a runaway spawn loop should stay aborted even across a resume attempt), but may be raised by the user manually editing `state.spawn_budget` / `state.wall_clock_budget_s` before resume if the abort was legitimate-but-underbudgeted.
+
+### Step 3.8: Assign severity and persist state per lens
+
+For each completed `LensExchange` returned by Task 8 or 9:
+
+1. **If the terminal Reviewer turn returned a `SEVERITY:` line** (parsed per **Parsing contract §2**): use that directly.
+
+2. **Else:** infer from the final JUDGMENT via the mapping:
+
+   ```
+   cited     -> clean
+   handwaved -> minor
+   evaded    -> major
+   conceded  -> critical
+   ```
+
+3. **Compose the lens record:**
+
+   ```json
+   {
+     "lens_id": lens.lens_id,
+     "name": lens.name,
+     "severity": <final severity>,
+     "one_line_finding": <Moderator synthesizes from the terminal Reviewer JUDGMENT + REASONING>,
+     "evidence": <Author's citation text if provided; "absent" if author said 'paper does not address this'>,
+     "author_best_defense": <Author's final answer text>,
+     "why_it_didnt_hold": <Reviewer's final REASONING, only if severity != "clean">,
+     "summary_for_compaction": <Moderator writes 2-3 sentence summary immediately — used by T10 transcript compaction to collapse this lens when the running context grows past COMPACTION_THRESHOLD_CHARS>,
+     "moderator_signals": <exchange.moderator_signals — per-round signal array: "progressing" | "stalling" | "converging">,
+     "transcript_slice": <exchange.transcript_slice — all reviewer/author/moderator turns for this lens>
+   }
+   ```
+
+   Moderator generates `one_line_finding` and `summary_for_compaction` by reading the exchange — these are NOT asked of either subagent. `summary_for_compaction` is what T10's `summarize_exchange` function returns when this lens is later rolled into the compacted `running_ctx`; storing it at lens-close time avoids re-summarizing on every subsequent compaction.
+
+4. **Write state.json:** append the lens record to `state.lenses_completed[]`, then write the entire state.json file. Use atomic write: write to `<file>.tmp` then `mv`:
+
+   ```bash
+   cp state.json state.json.bak
+   <write new state to state.json.tmp>
+   mv state.json.tmp state.json
+   ```
+
+   If the write fails: retry once. Second failure → abort the whole run; the `.bak` preserves the last good state.
+
+5. **User-visible progress message:**
+
+   > Lens <N> (<name>) complete — severity: <severity>
+
+### Step 3.8.5: Run budget and abort fields
+
+Worst-case spawn count for a depth-N run is ~9 lenses × (1 initial + 1 Author + 1 terminal) + up to ~3 retries per lens ≈ 50–65 `Agent` spawns. Worst-case wall clock approaches 30 minutes on slow NotebookLM. Without a hard abort mechanism, a hung lens or a runaway Moderator-steer loop can silently blow through both. The following fields in `state.json` close that hole.
+
+**Schema additions to `state.json` (declared here; initialized in Phase 1 Step 1.4; incremented/enforced in Phase 3):**
+
+```json
+{
+  ...
+  "spawn_count":                  0,
+  "spawn_budget":                 80,
+  "wall_clock_start":             "<ISO 8601 — set once at Phase 0>",
+  "wall_clock_budget_s":          1800,
+  "abort_reason":                 null,
+  "moderator_own_context_est_chars": 0
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `spawn_count` | Incremented by **1 on every `Agent(...)` call** across all phases (classification spawn, novelty-check runner, every per-round Reviewer and Author spawn). |
+| `spawn_budget` | Hard ceiling. Default `80` (≈25% headroom over the ~65-spawn worst case). Configurable per-run by an eventual `--spawn-budget` arg (out of scope for v1). |
+| `wall_clock_start` | ISO 8601 timestamp captured once when Phase 0 begins. Not reset on resume — a resumed run continues counting against the original budget unless the user opts to reset. |
+| `wall_clock_budget_s` | Default `1800` seconds = 30 minutes. |
+| `abort_reason` | `null` for healthy runs. Set to one of `spawn_budget_exceeded`, `wall_clock_exceeded`, `moderator_context_exceeded`, or `fatal_error` on abort. |
+| `moderator_own_context_est_chars` | Running estimate of cumulative characters Main Claude has ingested from `Agent` tool results (one contribution per spawn). See Step 3.7.5. |
+
+**Enforcement (at the top of each lens iteration in Step 3.4):**
+
+```
+def check_budgets_before_lens(lens):
+    elapsed_s = (now() - parse_iso(state.wall_clock_start)).total_seconds()
+    if state.spawn_count >= state.spawn_budget:
+        abort_run(reason="spawn_budget_exceeded",
+                  detail=f"{state.spawn_count} spawns ≥ budget {state.spawn_budget}")
+    if elapsed_s >= state.wall_clock_budget_s:
+        abort_run(reason="wall_clock_exceeded",
+                  detail=f"{elapsed_s:.0f}s ≥ budget {state.wall_clock_budget_s}s")
+    if state.moderator_own_context_est_chars >= MODERATOR_OWN_CONTEXT_SOFT_LIMIT_CHARS:
+        abort_run(reason="moderator_context_exceeded",
+                  detail=f"{state.moderator_own_context_est_chars} ≥ limit {MODERATOR_OWN_CONTEXT_SOFT_LIMIT_CHARS}")
+```
+
+**`abort_run(reason, detail)` behavior:**
+
+1. Set `state.abort_reason = reason`, `state.run_status = "aborted"`, `state.completed_at = now_iso()`.
+2. Synthesize a **partial briefing** via the Phase 5 path with the `partial=True` flag: render whatever lenses are in `state.lenses_completed`, label the top-of-briefing status as `PARTIAL — aborted: <reason>`, fill `{{TOP_KILLER_QUESTIONS}}` / `{{RECOMMENDATION}}` with the string `N/A — run aborted before Phase 4 synthesis; see per-lens findings below`, and include the abort `detail` string prominently under the TL;DR.
+3. Persist `state.json` atomically (same pattern as Step 3.8 step 4).
+4. Emit user-visible:
+
+   > ⚠️ **Paper stress-test aborted** — <reason>. <detail>. Partial briefing at `<path>`. Resume with the skill's `--resume <slug>` option (see error-handling section) to continue from lens <next_lens_id>.
+
+5. Terminate the skill cleanly (do NOT run Phase 4 / 6 on an aborted run; Phase 5's partial-briefing writer IS invoked above).
+
+**Spawn counter wrapper (required implementation pattern):**
+
+Every `Agent(...)` call in Phase 3 (and Phase 2a's classification call) MUST go through `spawn_agent(...)` so the budget counters cannot be forgotten at a call site:
+
+```
+def spawn_agent(**kwargs):
+    state.spawn_count += 1
+    result = Agent(**kwargs)
+    state.moderator_own_context_est_chars += len(result)
+    return result
+```
+
+This is a drop-in wrapper and does not alter semantics.
+
+### End of Phase 3
+
+All active lenses are complete. `state.lenses_completed[]` has one entry per active lens. `state.transcript[]` has all turns (or the full uncompacted record on disk; compacted copies are in-memory only). No persistent subagents exist — every Reviewer and Author turn was a fresh synchronous `Agent` spawn.
 <!-- Phase 4 instructions added in Task 12 -->
 <!-- Phase 5 instructions added in Task 13 -->
 <!-- Phase 6 instructions added in Task 14 -->
