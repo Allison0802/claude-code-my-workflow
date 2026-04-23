@@ -1,0 +1,9 @@
+JUDGMENT: handwaved
+REASONING: The Author cited Table 3 but Table 3 reports variance inflation only at a single time point; the lens question was about behavior across follow-up.
+NEXT: FOLLOWUP
+FOLLOWUP: Show me the variance inflation at t=60 and t=90 days, or explain why Table 3's single-point result extrapolates.
+---FIXTURE_SEPARATOR---
+JUDGMENT: cited
+REASONING: The Author quoted Section 2.3's regularity conditions verbatim and they cover the lens question.
+NEXT: FINAL
+SEVERITY: clean

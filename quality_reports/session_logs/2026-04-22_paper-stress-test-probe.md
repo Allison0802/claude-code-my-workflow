@@ -25,3 +25,12 @@ The probe was run by the orchestrating Claude session (not by a subagent, since 
 
 ## Note on pre-amendment evidence
 Before this formal probe, a different probe (`probe_counter`) was spawned during architectural planning with instructions to reply `READY`; it did so in its initial tool result. That early evidence was already sufficient to conclude that synchronous `Agent` works on this harness. The formal probe above supersedes it and is recorded here for audit completeness.
+
+## 2026-04-23 Task 1.5 Changes
+
+- [01:50] `.claude/skills/paper-stress-test/SKILL.md` -- Added `## Parsing contract` section (L41–L165) between `## Constants` and `## Defer-tool preamble`; provides canonical regexes for all 7 subagent output patterns (Reviewer question, judgment+decision, Lens 7 initial, Lens 7 confrontation, Author answer, classification triple, novelty-check report) plus reparse protocol and cross-reference table. Committed as a5c38d4.
+
+## 2026-04-23 Task 1.6 Changes
+
+- [02:25] `.claude/skills/paper-stress-test/tests/fixtures/0{1..7}_*.txt` -- Seven realistic fixtures, one per Parsing-contract pattern; variants 02/04/05 use `---FIXTURE_SEPARATOR---` to bundle alternative branches (FOLLOWUP/FINAL, CONFRONTATION/early-close, addressed/absent). Fixture 07 aligned to the actual `novelty-check` Phase D output format (`Score: X/10`, `Recommendation: PROCEED | PROCEED WITH CAUTION | ABANDON`) rather than the plan draft's `Overall score:` / `build-on` which would not match the SKILL.md Pattern 7 regex.
+- [02:26] `.claude/skills/paper-stress-test/tests/test_parsing.sh` -- POSIX-sh wrapper around a python3 harness that applies each SKILL.md regex (Patterns 1–7) to its fixture with `re.DOTALL | re.MULTILINE` per the parsing contract and asserts an expected capture substring. Exit 0 iff all seven PASS. Current result: `all 7 patterns PASS`.

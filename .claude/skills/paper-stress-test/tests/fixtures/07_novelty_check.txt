@@ -1,0 +1,15 @@
+## novelty-check report
+
+### Overall Novelty Assessment
+- Score: 7/10
+- Recommendation: PROCEED WITH CAUTION
+- Key differentiator: jackknife bias correction is new; core estimator is a re-derivation of Overgaard 2017.
+- Risk: a reviewer familiar with Overgaard 2017 would cite it as prior art and ask for a head-to-head benchmark.
+
+### Closest Prior Work
+
+| paper | year | venue | overlap | key_difference |
+|-------|------|-------|---------|----------------|
+| Overgaard et al. "Pseudo-observations for competing risks" | 2017 | JASA | 85% | No jackknife correction; assumes stronger censoring model. |
+| Andersen & Pohar Perme "Pseudo-observation in survival analysis" | 2010 | Stat Med | 60% | Single-event framework only. |
+| Aalen & Johansen "Empirical transition matrix" | 1978 | Scand J Stat | 40% | Non-parametric baseline; different estimand family. |
