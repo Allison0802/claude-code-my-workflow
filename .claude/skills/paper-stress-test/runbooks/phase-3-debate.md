@@ -292,6 +292,27 @@ After the loop, if severity still unset: spawn one terminal Reviewer with close_
 | `handwaved` | `minor` |
 | `evaded`    | `major` |
 
+### 8. Per-lens validator call (MANDATORY)
+
+**After appending the lens_record to `state.lenses_completed` and persisting state.json, run the validator *on the current state.json* before starting the next lens:**
+
+```bash
+python3 scripts/validate_state.py ${state_path}
+```
+
+If it exits non-zero, the Moderator MUST:
+
+1. Parse the specific gate failures (one line per violation).
+2. Repair the just-closed lens_record. Common repairs:
+   - `transcript_slice length < 3` → you skipped populating actual turn content; rebuild from the last Reviewer/Author spawn outputs.
+   - `author_best_defense is empty` → extract from the round-1 Author ANSWER block in transcript_slice.
+   - `summary_for_compaction is empty` → write a ≤3-sentence summary of the lens now.
+   - `'judgment' was unexpected` → move the judgment string into `moderator_assessments[*].content`; it does NOT belong on the lens record.
+3. Re-persist state.json and re-run the validator.
+4. If the validator still fails after a second repair attempt, `abort_run("per_lens_validator_failed", detail=<lens_id> + violations)`. Do not advance to the next lens carrying a broken record — later lenses inherit the validation failure.
+
+**Rationale:** aggregate-only gates (Step 3.7) let a single bad lens infect all nine before anyone notices. Per-lens validation keeps the repair window small. This is the fix for the 2026-04-24 rubin_2007 hollow-run regression (89 gate violations shipped because the Moderator wrote transcripts.md directly from memory without building transcript_slice first).
+
 ---
 
 ## Step 3.7 — Aggregate gate check after all lenses

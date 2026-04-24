@@ -44,9 +44,7 @@ This section guides the sub-project teams on how (or whether) to cite/use the pa
 
 ## Step 4.4 — Compose verdict + recommendation
 
-**Verdict prose** (2–4 sentences, **≤150 words hard cap**, enforced by phase-5 render-time check): synthesize across lenses. Lead with what the paper does well (clean lenses), then what fails (major/critical). End with the one line that summarizes whether the paper is trustworthy for its claimed scope.
-
-A verdict longer than 150 words is a spec violation — not a stylistic choice. Push details into per-lens findings and the recommendation rationale instead. If you need to mention 3 major findings and 4 minors, a bullet list inside the verdict counts against the cap too: compress to "three major (lenses X/Y/Z); four minor".
+**Verdict prose** (2–4 sentences): synthesize across lenses. Lead with what the paper does well (clean lenses), then what fails (major/critical). End with the one line that summarizes whether the paper is trustworthy for its claimed scope.
 
 **Recommendation** — mechanical rule based on severity tally across `lenses_completed`:
 

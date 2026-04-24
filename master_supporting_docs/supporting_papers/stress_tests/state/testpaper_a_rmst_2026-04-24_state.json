@@ -1,0 +1,249 @@
+{
+  "schema_version": "2",
+  "paper": {
+    "title": "A Closed-Form Variance Estimator for Restricted-Mean-Survival-Time Pseudo-Observations under Right Censoring",
+    "authors": ["Synthetic Authors A.", "Synthetic Authors B.", "Synthetic Authors C."],
+    "year": 2026,
+    "source": "master_supporting_docs/supporting_papers/test_papers/testpaper_a_rmst_variance.pdf",
+    "slug": "testpaper_a_rmst_2026-04-24"
+  },
+  "invocation": {
+    "depth": 1,
+    "type_override": null,
+    "cross_check_override": null,
+    "skip_novelty": true,
+    "human_checkpoint": false
+  },
+  "notebooks": {
+    "disposable": {
+      "id": "e2c32d6b-dde4-4888-92f9-5bbf64bbc9e6",
+      "name": "stress-test-testpaper_a_rmst_2026-04-24",
+      "created_at": "2026-04-24T11:20:00-04:00",
+      "disposition": "deleted",
+      "promoted_to": null
+    },
+    "thematic": {
+      "id": "0bf80af5-8b8d-423d-b7ef-94b13ad48f7b",
+      "name": "ML for Recurrent Events"
+    }
+  },
+  "detected_type": "new-estimator",
+  "classification_source": "reviewer",
+  "headline_claim": "The paper proposes an influence-function-based closed-form pseudo-observation for RMST under independent right censoring that the authors recommend as a drop-in replacement for jackknife pseudo-observations in RMST regression, reducing per-observation cost from O(n) to O(1) while maintaining near-nominal Wald coverage.",
+  "novelty_claims": [
+    "Closed-form pseudo-observation theta_tilde_i(tau) = mu_hat(tau) + IF_hat_i(tau) via Kaplan-Meier influence function, replacing the jackknife recipe.",
+    "Variance estimator sigma_hat^2 = n^{-1} sum_i IF_hat_i^2 derived from Var(theta_tilde_i) approx Var(IF_hat_i).",
+    "Per-observation cost reduction from O(n) to O(1).",
+    "Simulation at n=500 with ~30% censoring shows 95% Wald coverage of 0.933-0.947.",
+    "Drop-in substitute for jackknife pseudo-observations in standard RMST-regression GEE pipelines."
+  ],
+  "novelty_check": {
+    "status": "skipped",
+    "skip_reason": "user_flag: --skip-novelty passed; synthetic test paper, novelty-check would hallucinate prior work."
+  },
+  "lens_plan": [
+    {"lens_id": 0, "name": "data", "weight": "medium", "depth": 1},
+    {"lens_id": 1, "name": "estimand", "weight": "heavy", "depth": 1},
+    {"lens_id": 2, "name": "identification", "weight": "medium", "depth": 1},
+    {"lens_id": 3, "name": "methodology", "weight": "heavy", "depth": 1},
+    {"lens_id": 4, "name": "overclaims", "weight": "medium", "depth": 1},
+    {"lens_id": 5, "name": "alternatives", "weight": "light", "depth": 1},
+    {"lens_id": 6, "name": "generalizability", "weight": "heavy", "depth": 1},
+    {"lens_id": 7, "name": "positioning", "weight": "heavy", "depth": 1},
+    {"lens_id": 8, "name": "reproducibility", "weight": "medium", "depth": 1}
+  ],
+  "lenses_completed": [
+    {
+      "lens_id": 0,
+      "name": "data",
+      "severity": "major",
+      "one_line_finding": "Simulation tests a single DGP (n=500, ~30% independent censoring) and fixes every parameter but covariate effect size; no covariate-dependent censoring, heavy ties at tau, small-n, or heavy-censoring regime is tested.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 0 (data): single DGP simulation at n=500 with ~30% independent censoring; no scope beyond the stated regime tested. Author conceded absence of covariate-dependent censoring, competing risks, small-n, and heavy-censoring variants. Severity major: scope is narrow but explicitly stated.",
+      "moderator_signals": ["author-conceded", "scope-narrow", "simulation-one-cell"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: Your simulation DGP appears to invoke independent right-censoring and likely exponential/Weibull event times on modest sample sizes, yet RMST pseudo-observations are routinely deployed in registries and EHR-derived cohorts where censoring is covariate-dependent, administrative truncation creates heavy ties at the restriction time tau, and competing risks are non-negligible - what evidence do you have that your closed-form variance estimator does not collapse (in coverage or bias) under covariate-dependent censoring, a spike of observations at tau, or n < 200 with >50% censoring, and why were these regimes omitted from the replicate grid?", "timestamp_iso": "2026-04-24T11:25:00-04:00", "lens_id": 0, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this. The closest adjacent content is the simulation section (Section 3) and setup (Section 2.1), which together reveal the narrow scope. The paper assumes T perp C throughout (stated explicitly in Section 2.1) and the single simulation scenario uses n=500 iid exponential event times with uniform independent censoring producing approximately 30% administrative censoring at fixed tau=2. No covariate-dependent censoring, no competing risks, no n<200, no heavy-censoring (>50%) regime, and no heavy-tie structure at tau appear anywhere in the paper. The Discussion (Section 4) narrows the recommendation further to 'large datasets'. The simulation grid varies only covariate effect size beta in {0.0, 0.2, 0.5}; sample size, censoring mechanism, censoring rate, and competing events are held fixed.", "timestamp_iso": "2026-04-24T11:30:00-04:00", "lens_id": 0, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author explicitly acknowledges the paper does not address covariate-dependent censoring, competing risks, small-n, or heavy-censoring regimes, and quotes the narrow DGP while conceding the T perp C assumption and 'large datasets' recommendation.\nNEXT: FINAL\nSEVERITY: major", "timestamp_iso": "2026-04-24T11:40:00-04:00", "lens_id": 0, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "Author conceded the paper does not address the scope-breadth question; single DGP with narrow parameters leaves coverage behavior under practical survival settings unknown."
+    },
+    {
+      "lens_id": 1,
+      "name": "estimand",
+      "severity": "critical",
+      "one_line_finding": "Paper does not distinguish the estimand mu(tau)=E[min(T,tau)] from the censoring-dependent plug-in integral of S-hat, fixes tau=2 by fiat, and does not address tail identifiability when S(tau)>0.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 1 (estimand): tau chosen arbitrarily with no identifiability rule; the paper blurs mu(tau) and its KM plug-in. No discussion of behavior beyond last observed event time or at the KM plateau.",
+      "moderator_signals": ["author-conceded", "estimand-ambiguous", "tau-unjustified"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: The manuscript claims a closed-form variance for pseudo-observations targeting mu(tau) = E[min(T, tau)], but under right censoring with tau exceeding the support of the observed event times (or when S(tau) > 0 with informative administrative censoring), mu(tau) is only identifiable up to the Kaplan-Meier plateau - so is tau pre-specified as inf{t : G-hat(t) > epsilon} for some epsilon, and does your 'closed-form' identity actually target mu(tau) or the censoring-dependent functional integral of S-hat(u) whose estimand drifts with the censoring distribution?", "timestamp_iso": "2026-04-24T11:25:00-04:00", "lens_id": 1, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this. It defines the estimand as mu(tau) = E[min(T, tau)] and the estimator as mu-hat(tau) = integral of S-hat(u) du but does not distinguish between the two concepts or characterize the integral as a censoring-dependent functional. It imposes independent censoring (T perp C) without qualification and treats tau as a fixed constant chosen by the analyst - in the simulation it is set to tau = 2 with no justification tied to the censoring distribution, the observed event-time support, or any epsilon-threshold rule. There is no discussion of identifiability when S(tau) > 0, of behavior at the Kaplan-Meier plateau, or of what the estimator targets when tau lies beyond the last observed event time.", "timestamp_iso": "2026-04-24T11:30:00-04:00", "lens_id": 1, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author admits tau=2 is fixed arbitrarily with no identifiability rule and no distinction between the target estimand mu(tau) and the censoring-dependent plug-in, so the 'closed-form variance' targets an undefined estimand in the tail.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T11:40:00-04:00", "lens_id": 1, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "Tail identifiability beyond the KM plateau is undefined; tau=2 chosen without an epsilon-threshold rule tying it to the censoring support."
+    },
+    {
+      "lens_id": 2,
+      "name": "identification",
+      "severity": "major",
+      "one_line_finding": "Independent-censoring assumption T perp C stated once and never defended; no covariate-conditional censoring treatment, no sensitivity analysis, no Discussion limitation.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 2 (identification): T perp C asserted without defense. No discussion of baseline-vs-time-varying confounders, no G(t|X_0) sensitivity analysis. The simulation operationalizes the assumption exactly, so no empirical evidence about variance drift under informative censoring is generated. Severity downgraded from reviewer's 'critical' to major: the scope limitation is explicit in the assumptions, not a fatal flaw.",
+      "moderator_signals": ["author-conceded", "assumption-asserted-not-defended", "reviewer-severity-overrated"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: The estimator's consistency hinges on the marginal independent-censoring assumption T perp C, yet the paper applies it to oncology and cardiovascular cohorts where censoring is demonstrably driven by time-varying prognostic factors (disease progression, treatment switches, competing deaths) - why should readers accept a baseline-covariate-conditional KM weight G(t|X_0) as adequate when the residual dependence between T and C through post-baseline covariates will bias the RMST pseudo-observation and invalidate the sandwich variance, and where is the sensitivity analysis quantifying how far off the closed-form variance drifts under plausible informative-censoring regimes?", "timestamp_iso": "2026-04-24T11:25:00-04:00", "lens_id": 2, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper states the censoring assumption once, in Section 2.1: 'Assume T perp C.' No justification is offered for this assumption's plausibility in any applied setting. The paper does not address covariate-conditional censoring, time-varying prognostic factors, baseline-covariate-conditional KM weights G(t|X_0), or residual dependence between T and C through post-baseline measurements. On the sandwich variance under misspecification: the paper derives the sandwich variance under the same marginal independence assumption and does not analyze its behavior when that assumption is violated. The simulation operationalizes the assumption exactly, so no empirical evidence is generated about variance drift under informative censoring. No limitations related to censoring mechanism are acknowledged anywhere in the text.", "timestamp_iso": "2026-04-24T11:30:00-04:00", "lens_id": 2, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author admits the paper offers no justification, no covariate-conditional censoring treatment, no sensitivity analysis, and no Discussion limitation - a full concession that the identification assumption is asserted without defense in a domain where it is known to fail.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T11:40:00-04:00", "lens_id": 2, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "T perp C is asserted without justification and no sensitivity analysis; downgraded from reviewer's 'critical' to 'major' because scope is declared in assumptions, not concealed."
+    },
+    {
+      "lens_id": 3,
+      "name": "methodology",
+      "severity": "critical",
+      "one_line_finding": "No derivation, no Donsker / bracketing-entropy conditions, no uniform KM consistency rate, no cross-fitting - the identity Var(theta-tilde_i) approx Var(IF_i) rests on a single appeal to 'standard influence-function arguments'.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 3 (methodology): the asymptotic theory the method claims is entirely absent. No rate conditions, no entropy, no cross-fitting. Sole justification is the phrase 'standard influence-function arguments'. Critical per the reviewer.",
+      "moderator_signals": ["author-conceded", "theory-absent", "informal-justification"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: Your Theorem 1 asserts that the closed-form plug-in variance Var(theta-tilde_i) approx Var(IF_i) is consistent for the asymptotic variance of the RMST pseudo-observation under right censoring, yet the manuscript provides no derivation showing that the remainder term from the jackknife linearization is o_p(n^{-1/2}) - where are the Donsker / bracketing-entropy conditions on the Kaplan-Meier influence-function class, the uniform consistency rate for G-hat(t) on [0, tau], and the cross-fitting (or sample-splitting) argument that justifies equating the working variance of the pseudo-observation with Var(IF_i) rather than treating the KM-plug-in as a nuisance whose estimation error contaminates the IF expansion?", "timestamp_iso": "2026-04-24T11:25:00-04:00", "lens_id": 3, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this. The manuscript contains no derivation showing that the remainder from the jackknife linearization is o_p(n^{-1/2}), no Donsker or bracketing-entropy conditions on the Kaplan-Meier influence-function class, no uniform consistency rate for S-hat(t) or G-hat(t) on [0, tau], and no cross-fitting or sample-splitting argument. The sole justification offered for equating Var(theta-tilde_i) with Var(IF_i) is the phrase 'standard influence-function arguments,' with no supporting lemma, citation to a regularity theorem, or list of sufficient conditions.", "timestamp_iso": "2026-04-24T11:30:00-04:00", "lens_id": 3, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author explicitly admits no derivation, no regularity conditions, no Donsker/entropy bounds, no uniform rate for G-hat, and no cross-fitting - offering only a vague appeal to 'standard influence-function arguments' that cannot substitute for proof.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T11:40:00-04:00", "lens_id": 3, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "The identity Var(theta-tilde_i) approx Var(IF_i) is informally motivated without the rate / Donsker / cross-fitting machinery that would certify consistency."
+    },
+    {
+      "lens_id": 4,
+      "name": "overclaims",
+      "severity": "major",
+      "one_line_finding": "Drop-in-replacement framing plus 2-decimal coverage with no head-to-head jackknife comparison and no Monte Carlo SEs on (0.947, 0.942, 0.933).",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 4 (overclaims): 'drop-in replacement' and the O(n) vs O(1) claim asserted analytically with no paired jackknife benchmark and no MC SEs. Major, downgraded from reviewer's 'critical' because the method-class claim (IF-based PO) is at least gestured at, even if empirically unvalidated.",
+      "moderator_signals": ["author-conceded", "missing-benchmark", "missing-uncertainty"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: You market this estimator as a 'drop-in replacement' for the jackknife and report coverage figures to two-decimal precision, yet the paper contains no head-to-head jackknife benchmark on the same simulated datasets and no Monte Carlo standard errors or confidence intervals on those coverage point estimates - so on what evidentiary basis can a reader distinguish your reported 94.8% coverage from the jackknife's presumed 95% (or from each other across scenarios), and why should 'drop-in replacement' be believed rather than merely asserted?", "timestamp_iso": "2026-04-24T11:25:00-04:00", "lens_id": 4, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this in two distinct ways. On the head-to-head jackknife benchmark: the paper does not report any simulation results for the jackknife estimator on the same datasets. Table 1 contains coverage figures only for the proposed estimator. No jackknife coverage column, no jackknife bias column, and no jackknife standard-error column appear anywhere. The computational advantage is asserted analytically (O(n) vs O(1) per observation once the Kaplan-Meier fit is available), not demonstrated empirically. On Monte Carlo standard errors: the paper does not report them. Table 1 presents three point estimates (0.947, 0.942, 0.933) with no uncertainty quantification.", "timestamp_iso": "2026-04-24T11:30:00-04:00", "lens_id": 4, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author explicitly admits no head-to-head jackknife column, no MC SEs on coverage, and that the O(n) vs O(1) claim is asserted rather than benchmarked - the 'drop-in replacement' framing is therefore unsupported.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T11:40:00-04:00", "lens_id": 4, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "'Drop-in replacement' is declared, not demonstrated; no head-to-head jackknife comparison or MC-SE reporting."
+    },
+    {
+      "lens_id": 5,
+      "name": "alternatives",
+      "severity": "major",
+      "one_line_finding": "Single benign DGP (Exp(1)/Unif(0,4)), no head-to-head against jackknife or infinitesimal-jackknife, so nominal coverage could be a DGP artifact rather than an estimator property.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 5 (alternatives): one DGP, no comparator, informal IF justification - the advantage over any reasonable plug-in variance is unidentified. Major, downgraded from 'critical'.",
+      "moderator_signals": ["author-conceded", "single-dgp", "no-comparator"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: Is the reported nominal coverage an intrinsic property of your closed-form variance estimator, or an artifact of the benign Exp(1) event-time / Unif(0,4) censoring DGP (light censoring, exponential tails, proportional hazards trivially satisfied) - and since the paper reports no head-to-head jackknife (or infinitesimal-jackknife) coverage on the same simulated draws, how do you rule out that any reasonable plug-in variance would achieve nominal coverage here, leaving the estimator's advantage unidentified?", "timestamp_iso": "2026-04-24T11:25:00-04:00", "lens_id": 5, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this. The paper does not include a head-to-head comparison of the closed-form estimator against the jackknife or any other variance estimator, so the question of whether any reasonable plug-in variance would achieve comparable coverage on these same draws is left entirely open. The paper does not address whether the reported coverage is an intrinsic property of the estimator or a product of the simulation conditions. On the theoretical side, the paper invokes 'standard influence-function arguments' to assert Var(theta-tilde_i) approx Var(IF-hat_i) without formal proof or asymptotic derivation, so the near-nominal coverage figures (0.933-0.947) carry no theoretical guarantee distinguishing the proposed estimator from alternatives.", "timestamp_iso": "2026-04-24T11:30:00-04:00", "lens_id": 5, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author admits single benign DGP with no head-to-head against jackknife/bootstrap and only informal IF justification, so the estimator's advantage over any reasonable plug-in is unidentified.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T11:40:00-04:00", "lens_id": 5, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "Coverage advantage over a generic plug-in is not identifiable from one benign DGP without a paired comparator."
+    },
+    {
+      "lens_id": 6,
+      "name": "generalizability",
+      "severity": "major",
+      "one_line_finding": "Scope is strictly single-event, iid, independent-right-censored; no competing-risks, left-truncation, or time-varying-covariate extension or theoretical guarantee.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this. Graw 2009 is cited but not adopted or extended.",
+      "summary_for_compaction": "Lens 6 (generalizability): explicitly scoped to single-event right-censored iid data. No extension to competing risks, truncation, time-varying covariates. Graw 2009 is cited but not adopted. Major: scope is honestly declared, not hidden.",
+      "moderator_signals": ["author-conceded", "scope-declared", "no-extension-simulation"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: Your closed-form variance estimator is derived strictly under the assumption of a single terminal event with independent right censoring - how does it degrade (or fail outright) when applied to the settings that actually motivate RMST in practice, such as competing risks (where the Kaplan-Meier-based pseudo-observations are biased and should be replaced by cause-specific or Aalen-Johansen analogs), left-truncation / delayed entry (where the at-risk process violates your iid influence-function decomposition), or time-varying covariates, and can you give even one theoretical guarantee or simulation outside the single-event right-censored regime?", "timestamp_iso": "2026-04-24T11:25:00-04:00", "lens_id": 6, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address competing risks, left-truncation/delayed entry, or time-varying covariates, and provides no theoretical guarantee or simulation outside the single-event right-censored regime. The paper's setup is explicit and narrow. Section 2.1 assumes T perp C and iid. No competing risks, no truncation, no time-varying structure anywhere. The Kaplan-Meier estimator - not the Aalen-Johansen estimator - is the sole basis for the pseudo-observations. The paper contains no future-work section and no stated limitations beyond coverage decay. Graw et al. (2009) is cited but not adopted, extended, or discussed.", "timestamp_iso": "2026-04-24T11:30:00-04:00", "lens_id": 6, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author explicitly admits the paper has no theoretical guarantees, no simulations, and no discussion of generalizability beyond the single-event, independent-censoring, iid regime - a scope confession, not a defense.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T11:40:00-04:00", "lens_id": 6, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "No attempt at any extension or sensitivity analysis beyond single-event iid right-censoring."
+    },
+    {
+      "lens_id": 7,
+      "name": "positioning",
+      "severity": "critical",
+      "one_line_finding": "Bouaziz (2023, Biometrical Journal) already published the exact closed-form RMST pseudo-observation theta-tilde_i = mu-hat + IF-hat_i via Von Mises expansion of KM; Overgaard-Parner-Pedersen (2017, Annals of Statistics) is the asymptotic-theory precedent. Neither is cited.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this. References list contains only Andersen-Perme 2010 and Graw-Gerds-Schumacher 2009; Bouaziz 2023, Overgaard 2017, Jacobsen-Martinussen 2016 absent.",
+      "summary_for_compaction": "Lens 7 (positioning): exact prior-art precedent - Bouaziz (2023) published the identical closed-form RMST pseudo-observation formula three years earlier. Overgaard (2017) is the asymptotic-theory foundation. Neither cited. Critical - the paper's core novelty is a rediscovery.",
+      "moderator_signals": ["prior-art-precedent", "uncited-foundational-work", "novelty-claim-undermined"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "THEMATIC_QUERY: Bouaziz 2023 and Overgaard 2017 identified as exact-prior-art precedents. QUESTION: Bouaziz (2023, Biometrical Journal) already derived the exact closed-form RMST pseudo-observation theta-tilde_i = mu-hat + IF-hat_i via a Von Mises expansion of the Kaplan-Meier estimator - the identical estimator your paper presents as novel - yet Bouaziz is entirely absent from your reference list; how is this a contribution rather than a rediscovery, and what, specifically, does your variance derivation add beyond the influence-function formula Bouaziz already published? Relatedly, the rigorous justification for treating mu-hat + IF-hat_i as an asymptotically valid pseudo-observation rests on Overgaard, Parner, and Pedersen's (2017, Annals of Statistics) asymptotic theory for jackknife pseudo-observations, but you cite neither Overgaard et al. (2017) nor Jacobsen and Martinussen (2016); absent that machinery, on what theoretical basis do you claim your closed-form variance is consistent for the variance of the jackknife pseudo-observation it purports to replace?", "timestamp_iso": "2026-04-24T11:25:00-04:00", "lens_id": 7, "model": "opus", "notebooks_granted": ["disposable", "thematic"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address either part of this question. Bouaziz (2023) is entirely absent from the reference list. The paper's complete reference list contains exactly two entries: Andersen and Perme (2010) and Graw, Gerds, and Schumacher (2009). Neither Overgaard, Parner, and Pedersen (2017) nor Jacobsen and Martinussen (2016) is cited. The paper contains no discussion of prior closed-form pseudo-observation formulas, no engagement with Von Mises expansion literature, and no comparative analysis situating its estimator against existing influence-function derivations. On the novelty claim, the paper's stated contribution is computational: replacing the O(n) leave-one-out jackknife with an O(1) closed-form calculation once the Kaplan-Meier fit is available. The paper does not claim originality for the form theta-tilde_i = mu-hat + IF-hat_i itself, but it provides no literature review that would allow a reader to assess whether this form is novel. On theoretical justification, the paper invokes only the phrase 'standard influence-function arguments' to assert Var(theta-tilde_i) approx Var(IF-hat_i).", "timestamp_iso": "2026-04-24T11:30:00-04:00", "lens_id": 7, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: evaded\nREASONING: Author neither cites Bouaziz (2023) nor Overgaard (2017), offers no literature review, and dismisses theoretical justification as 'standard influence-function arguments' - sidestepping the priority/rediscovery challenge entirely.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T11:40:00-04:00", "lens_id": 7, "model": "opus", "notebooks_granted": ["disposable", "thematic"]}
+      ],
+      "why_it_didnt_hold": "Exact prior-art precedent (Bouaziz 2023) published the same estimator three years earlier; the paper's 'novel' closed-form identity is a rediscovery of known work, and the asymptotic-theory foundation (Overgaard 2017) is also uncited."
+    },
+    {
+      "lens_id": 8,
+      "name": "reproducibility",
+      "severity": "minor",
+      "one_line_finding": "No seed, no public code, no MC standard errors on the reported coverage; parametric DGP (Unif censoring) means no KM-bandwidth tuning applies, but the manuscript makes no such clarifying statement.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 8 (reproducibility): no seed, no repo, no MC SEs. MC noise floor at B=1000 is ~1.4 percentage points - within the range of the reported 0.933-0.947. DGP is fully parametric so no censoring-model tuning applies. Minor: all information needed to reimplement is in the methods section.",
+      "moderator_signals": ["author-conceded", "missing-seed", "missing-mc-se"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: The simulation claims 95% coverage at the nominal rate across thousands of replications, yet the paper reports no random seed, no public code repository, no tuning details for the censoring-distribution estimator (e.g., Kaplan-Meier grid, bandwidth, or tie-handling), and crucially no Monte Carlo standard errors on the coverage percentages - so how can a reader distinguish a genuinely well-calibrated estimator from one whose reported 94.8%-95.2% range is simply the MC noise floor at the chosen replication count?", "timestamp_iso": "2026-04-24T11:25:00-04:00", "lens_id": 8, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this in full. On the question of MC noise floor and distinguishing genuine calibration from sampling variability: the paper reports no Monte Carlo standard errors on any coverage estimate. At B = 1,000 replications, the binomial MC standard error for a true 95% coverage rate is approximately sqrt(0.95 x 0.05 / 1000) approx 0.007, meaning the reported values of 0.947, 0.942, and 0.933 each carry a margin of roughly +/-1.4 percentage points - information the paper withholds entirely. On random seed, code repository, and tuning details for the censoring-distribution estimator: the paper contains no mention of any of these. The censoring time C_i is fully parametric (Uniform), so no bandwidth or grid tuning applies to the censoring model in this design - but the paper makes no such clarifying statement, and provides no seed, no repository, and no MC standard errors.", "timestamp_iso": "2026-04-24T11:30:00-04:00", "lens_id": 8, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author admits no seed, no repo, no MC SEs in the paper, and only supplies the +/-1.4pp noise floor calculation post hoc while acknowledging the manuscript itself omits it - a direct concession that reproducibility and MC-uncertainty reporting are absent.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T11:40:00-04:00", "lens_id": 8, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "Missing seed, repo, and MC SEs make exact figure reproduction impossible; core method description is sufficient for reimplementation."
+    }
+  ],
+  "synthesis": {
+    "verdict": "The paper proposes an influence-function-based closed-form RMST pseudo-observation, theta-tilde_i = mu-hat + IF-hat_i, and claims a simple closed-form variance sigma-hat^2 = n^{-1} sum IF-hat_i^2 under independent right censoring. The thematic-notebook check surfaces an exact precedent: Bouaziz (2023) published the identical closed-form RMST pseudo-observation via Von Mises expansion three years earlier, entirely uncited. The asymptotic-theory scaffolding (Overgaard et al. 2017, Jacobsen-Martinussen 2016) is also uncited, and the paper provides no rate conditions, no Donsker class, no cross-fitting, no head-to-head jackknife benchmark, and no MC standard errors. Recommendation: skip - the headline novelty is a rediscovery, and the theoretical backing is asserted rather than proved.",
+    "top_killer_questions": [
+      {"question": "Bouaziz (2023, Biometrical Journal) already derived the exact closed-form RMST pseudo-observation theta-tilde_i = mu-hat + IF-hat_i via Von Mises expansion of the Kaplan-Meier estimator; why is this paper's 'novel' identity a contribution rather than a rediscovery?", "lens_id": 7, "lens_name": "positioning", "severity": "critical", "why_it_matters": "The paper's headline novelty is already in the published literature and uncited; any citation of this work as the original source is incorrect."},
+      {"question": "Where are the Donsker / bracketing-entropy conditions on the Kaplan-Meier influence-function class, the uniform consistency rate for G-hat(t) on [0, tau], and the cross-fitting argument that would justify equating Var(theta-tilde_i) with Var(IF-hat_i)?", "lens_id": 3, "lens_name": "methodology", "severity": "critical", "why_it_matters": "The variance claim rests on 'standard influence-function arguments' with no regularity conditions or formal theorem; any downstream paper citing this for consistency cites beyond what is proved."},
+      {"question": "Does the 'closed-form' identity target mu(tau) = E[min(T, tau)] or the censoring-dependent functional integral_0^tau S-hat(u) du when S(tau) > 0, and how is tau pre-specified relative to the KM plateau?", "lens_id": 1, "lens_name": "estimand", "severity": "critical", "why_it_matters": "Without an identifiability rule for tau, the estimand drifts with the censoring distribution in the tail and the 'closed-form' identity targets an undefined quantity."},
+      {"question": "The 'drop-in replacement' claim is made without a head-to-head jackknife benchmark on the same simulated datasets and without Monte Carlo standard errors on the coverage estimates - on what evidentiary basis is 94.8% distinguishable from jackknife's presumed 95%?", "lens_id": 4, "lens_name": "overclaims", "severity": "major", "why_it_matters": "Drop-in-replacement claims in methods papers must be backed by paired empirical comparison; without it, users cannot assess the tradeoff."},
+      {"question": "How does the estimator degrade under competing risks (Aalen-Johansen regime), left-truncation, or time-varying covariates, and is there any theoretical guarantee or simulation outside the single-event iid right-censored regime?", "lens_id": 6, "lens_name": "generalizability", "severity": "major", "why_it_matters": "Most applied RMST settings have at least one of these extensions; the method has no guarantee beyond the narrowest regime."}
+    ],
+    "subproject_relevance": {
+      "Missing Types": {
+        "applies": "No - not a useful reference or comparator.",
+        "data_match": "Poor. Missing Types targets missing event-type labels for recurrent competing-risks events with landmark FL-KM pseudo-observations; this paper is single-event scalar RMST.",
+        "warning": "This is a synthetic test paper. The real foundational references for closed-form RMST pseudo-observations are Bouaziz (2023) and Overgaard et al. (2017). Cite those, not this.",
+        "missing_comparator": "Not a candidate baseline."
+      },
+      "Comparisons": {
+        "applies": "No.",
+        "data_match": "Poor. Comparisons/ targets recurrent competing risks with frailty; this paper is single-event iid scalar Y.",
+        "warning": "Same as above - for influence-function RMST foundations, use Bouaziz 2023 and Overgaard 2017.",
+        "missing_comparator": "Not a candidate baseline."
+      }
+    },
+    "recommendation": "skip",
+    "recommendation_rationale": "Severity tally across the nine lenses: critical = 3 (lenses 1/3/7), major = 5 (lenses 0/2/4/5/6), minor = 1 (lens 8), clean = 0. Mechanical rule: major >= 5 (and also critical >= 1) -> skip. The decisive finding is Lens 7: Bouaziz (2023, Biometrical Journal) published the identical closed-form RMST pseudo-observation three years prior, entirely uncited. Combined with absence of any asymptotic theory and absence of a paired jackknife benchmark, the paper cannot be cited as either a novel contribution or a theoretically-grounded method.",
+    "severity_tally": {"critical": 3, "major": 5, "minor": 1, "clean": 0, "skipped": 0}
+  },
+  "moderator_assessments": [
+    {"lens_id": 0, "round": 1, "content": "R1 Author conceded narrow simulation scope. Severity accepted as major; reviewer initially proposed major, consistent.", "timestamp_iso": "2026-04-24T11:41:00-04:00"},
+    {"lens_id": 1, "round": 1, "content": "R1 Author conceded tau-identifiability ambiguity. Severity critical accepted - estimand drifts with censoring distribution in the tail.", "timestamp_iso": "2026-04-24T11:41:00-04:00"},
+    {"lens_id": 2, "round": 1, "content": "R1 Author conceded no defense of T perp C. Reviewer proposed critical; Moderator downgraded to major because the scope is explicit in assumptions, not concealed.", "timestamp_iso": "2026-04-24T11:41:00-04:00"},
+    {"lens_id": 3, "round": 1, "content": "R1 Author conceded no asymptotic theory. Severity critical accepted.", "timestamp_iso": "2026-04-24T11:41:00-04:00"},
+    {"lens_id": 4, "round": 1, "content": "R1 Author conceded no benchmark, no MC SE. Reviewer proposed critical; Moderator downgraded to major because the IF-based estimator class is at least gestured at.", "timestamp_iso": "2026-04-24T11:41:00-04:00"},
+    {"lens_id": 5, "round": 1, "content": "R1 Author conceded single-DGP identification gap. Reviewer proposed critical; Moderator downgraded to major - one DGP is thin but not fatal for a methods note.", "timestamp_iso": "2026-04-24T11:41:00-04:00"},
+    {"lens_id": 6, "round": 1, "content": "R1 Author conceded strict single-event scope. Reviewer proposed critical; Moderator downgraded to major because scope is honestly declared.", "timestamp_iso": "2026-04-24T11:41:00-04:00"},
+    {"lens_id": 7, "round": 1, "content": "R1 Author conceded absence of Bouaziz 2023, Overgaard 2017, Jacobsen-Martinussen 2016. Severity critical accepted - exact prior art precedent, core novelty undermined.", "timestamp_iso": "2026-04-24T11:41:00-04:00"},
+    {"lens_id": 8, "round": 1, "content": "R1 Author conceded missing seed/repo/MC-SE but noted parametric DGP. Reviewer proposed critical; Moderator downgraded to minor because the method is reimplementable from the methods section - missing metadata, not missing methodology.", "timestamp_iso": "2026-04-24T11:41:00-04:00"}
+  ],
+  "compaction_history": [],
+  "spawn_count": 28,
+  "spawn_budget": 80,
+  "wall_clock_start": "2026-04-24T11:21:30-04:00",
+  "wall_clock_budget_s": 1800,
+  "abort_reason": null,
+  "moderator_own_context_est_chars": 75000,
+  "run_status": "completed",
+  "started_at": "2026-04-24T11:20:00-04:00",
+  "completed_at": "2026-04-24T11:55:00-04:00"
+}

@@ -1,0 +1,47 @@
+{
+  "schema_version": "1",
+  "paper": {
+    "title": "A Random Forest Inverse Probability Weighted Pseudo-Observation Framework for Alternating Recurrent Events",
+    "authors": ["Abigail Loe", "Susan Murray", "Zhenke Wu"],
+    "year": 2025,
+    "source": "/Users/alison/Library/CloudStorage/OneDrive-UniversityofNorthCarolinaatChapelHill/Research/Missing Types/Papers/A Random Forest Inverse Probability Weighted Pseudo-Observation Framework for Alternating Recurrent Events.pdf",
+    "slug": "loe_2025_random_forest_2026-04-23"
+  },
+  "invocation": {
+    "depth": 2,
+    "type_override": null,
+    "cross_check_override": null,
+    "skip_novelty": false
+  },
+  "notebooks": {
+    "disposable": {
+      "id": "aee5b334-852f-4f7a-aab4-04077355e5d7",
+      "name": "stress-test-loe_2025_random_forest_2026-04-23",
+      "created_at": "2026-04-23T02:47:00Z",
+      "disposition": "pending",
+      "promoted_to": null
+    },
+    "thematic": {
+      "id": "0bf80af5-8b8d-423d-b7ef-94b13ad48f7b",
+      "name": "ML for Recurrent Events"
+    }
+  },
+  "detected_type": null,
+  "headline_claim": null,
+  "novelty_check": null,
+  "lens_plan": [],
+  "lenses_completed": [],
+  "synthesis": null,
+  "transcript": [],
+  "moderator_assessments": [],
+  "compaction_history": [],
+  "spawn_count": 0,
+  "spawn_budget": 80,
+  "wall_clock_start": "2026-04-23T02:47:00Z",
+  "wall_clock_budget_s": 1800,
+  "abort_reason": null,
+  "moderator_own_context_est_chars": 0,
+  "run_status": "in_progress",
+  "started_at": "2026-04-23T02:47:00Z",
+  "completed_at": null
+}

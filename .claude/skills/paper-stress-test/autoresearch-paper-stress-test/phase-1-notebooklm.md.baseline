@@ -124,12 +124,6 @@ Write `${OUT_ROOT}/state/${FULL_SLUG}_state.json` conforming to `schema/state.sc
 
 **Note:** `wall_clock_start` is initialized `null` here and set at the start of Phase 3 (after plan confirmation) to exclude idle user-prompt time from the budget. It is NOT reset on resume.
 
-**Timestamp semantics** (clarified 2026-04-24):
-- `started_at` — ISO of Phase-1 init. Marks when state.json first existed on disk.
-- `wall_clock_start` — ISO of Phase-3 start. Marks when the lens loop began. Always `>= started_at`. A 1-minute-or-larger gap is expected (Phase 2 plan confirmation sits between). Not a drift bug.
-- `completed_at` — ISO set in Phase 6 Step 6.6. Budgeted elapsed is `completed_at - wall_clock_start`, not `completed_at - started_at`.
-- Eval E6 checks `wall_clock_start >= started_at OR wall_clock_start is null`. Equality is not required.
-
 **Schema validation:** After writing, run `scripts/enforce_schema.py <state_path>` (see runbook §Step 6-validator once implemented). On failure, abort with the JSON Schema error messages inline.
 
 ---

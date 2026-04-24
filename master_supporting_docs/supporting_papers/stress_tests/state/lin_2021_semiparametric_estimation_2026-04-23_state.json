@@ -1,0 +1,221 @@
+{
+  "schema_version": "1",
+  "paper": {
+    "title": "Semiparametric estimation of the proportional rates model for recurrent events data with missing event category",
+    "authors": [
+      "Feng-Chang Lin",
+      "Jianwen Cai",
+      "Jason P Fine",
+      "Elisabeth P Dellon",
+      "Charles R Esther"
+    ],
+    "year": 2021,
+    "source": "Missing Types/Papers/Semiparametric estimation of the proportional rates model for recurrent.pdf",
+    "slug": "lin_2021_semiparametric_estimation_2026-04-23"
+  },
+  "invocation": {
+    "depth": 2,
+    "type_override": null,
+    "cross_check_override": null,
+    "skip_novelty": false,
+    "human_checkpoint": true
+  },
+  "notebooks": {
+    "disposable": {
+      "id": "d6782c7f-4e42-4fba-9991-d05512de89c4",
+      "name": "stress-test-lin_2021_semiparametric_estimation_2026-04-23",
+      "created_at": "2026-04-23T17:32:00Z",
+      "disposition": "pending",
+      "promoted_to": null
+    },
+    "thematic": {
+      "id": "0bf80af5-8b8d-423d-b7ef-94b13ad48f7b",
+      "name": "ML for Recurrent Events"
+    }
+  },
+  "detected_type": "new-estimator",
+  "headline_claim": "provide a more robust approach using a rate proportion method for the imputation of missing event types by demonstrating that \"the log-odds of the event type can be written as a semiparametric generalized linear model, facilitating a theoretically justified estimation framework\"",
+  "novelty_check": {
+    "status": "completed",
+    "runner_agent_id": "a1898725e8aa6b673",
+    "started_at": "2026-04-23T17:39:22.165860Z",
+    "completed_at": "2026-04-23T17:41:20.239569Z",
+    "overall_score": 6,
+    "recommendation": "PROCEED WITH CAUTION",
+    "key_differentiator": "The specific theoretical insight that under a proportional rates model the log-odds of event type reduces to a generalized partially linear model (exploiting rate proportionality to derive a clean log-linear structure in the baseline) is a genuine and precise contribution. No prior paper in the recurrent-events missing-type literature had explicitly derived this connection or used it to build a semiparametric imputation framework within the proportional rates model class specifically.",
+    "closest_prior_work": [
+      {
+        "paper": "Schaubel & Cai 2006a",
+        "year": 2006,
+        "venue": "Canadian J. Statistics",
+        "overlap": "Multiple imputation for recurrent events with missing event category, proportional rates/means model",
+        "key_difference": "Uses parametric multinomial logistic model for event-type; Lin et al. make this semiparametric"
+      },
+      {
+        "paper": "Schaubel & Cai 2006b",
+        "year": 2006,
+        "venue": "Scandinavian J. Statistics",
+        "overlap": "Rate/mean regression for multiple-sequence recurrent data with missing event category",
+        "key_difference": "Multi-sequence extension; parametric event-type model"
+      },
+      {
+        "paper": "Sun et al. 2015",
+        "year": 2015,
+        "venue": "Computational Statistics & Data Analysis",
+        "overlap": "Semiparametric additive rates model for multivariate recurrent events with missing event categories",
+        "key_difference": "Additive (not proportional) rate model; weighted estimating equations (not likelihood); does not derive the log-rate-ratio log-odds structure"
+      },
+      {
+        "paper": "Ma et al. 2018",
+        "year": 2018,
+        "venue": "Biometrics",
+        "overlap": "GART model with IPW/projection estimation, missing event type, recurrent events, cystic fibrosis CFFPR data",
+        "key_difference": "Accelerated recurrence time model (semiparametric AFT-type), not proportional rates; does not exploit rate proportionality for log-odds"
+      },
+      {
+        "paper": "Lin, Cai, Deng & Esther 2021a",
+        "year": 2021,
+        "venue": "Statistics in Medicine",
+        "overlap": "IPW estimation for recurrent events data with missing category, same CFFPR application",
+        "key_difference": "IPW only (no semiparametric event-type model); Lin et al. 2021b extends to semiparametric imputation"
+      }
+    ],
+    "raw_report_md": "Score: 6/10\nRecommendation: PROCEED WITH CAUTION\n[full report stored in briefing]"
+  },
+  "lens_plan": [
+    {
+      "lens_id": 0,
+      "name": "data",
+      "description": "Data structure & characteristics",
+      "weight": "medium",
+      "depth": 1
+    },
+    {
+      "lens_id": 1,
+      "name": "estimand",
+      "description": "Estimand clarity",
+      "weight": "heavy",
+      "depth": 2
+    },
+    {
+      "lens_id": 2,
+      "name": "identification",
+      "description": "Identification assumptions",
+      "weight": "medium",
+      "depth": 1
+    },
+    {
+      "lens_id": 3,
+      "name": "methodology",
+      "description": "Statistical methodology",
+      "weight": "heavy",
+      "depth": 2
+    },
+    {
+      "lens_id": 4,
+      "name": "overclaims",
+      "description": "Overclaims vs. evidence",
+      "weight": "medium",
+      "depth": 1
+    },
+    {
+      "lens_id": 5,
+      "name": "alternatives",
+      "description": "Alternative explanations",
+      "weight": "light",
+      "depth": 1
+    },
+    {
+      "lens_id": 6,
+      "name": "generalizability",
+      "description": "Generalizability",
+      "weight": "heavy",
+      "depth": 2
+    },
+    {
+      "lens_id": 7,
+      "name": "positioning",
+      "description": "Positioning vs. prior work (triangulation)",
+      "weight": "heavy",
+      "depth": 2
+    },
+    {
+      "lens_id": 8,
+      "name": "reproducibility",
+      "description": "Reproducibility",
+      "weight": "medium",
+      "depth": 1
+    }
+  ],
+  "lenses_completed": [
+    {
+      "lens_id": 0,
+      "name": "data",
+      "severity": "major"
+    },
+    {
+      "lens_id": 1,
+      "name": "estimand",
+      "severity": "major"
+    },
+    {
+      "lens_id": 2,
+      "name": "identification",
+      "severity": "major"
+    },
+    {
+      "lens_id": 3,
+      "name": "methodology",
+      "severity": "major"
+    },
+    {
+      "lens_id": 4,
+      "name": "overclaims",
+      "severity": "major"
+    },
+    {
+      "lens_id": 5,
+      "name": "alternatives",
+      "severity": "major"
+    },
+    {
+      "lens_id": 6,
+      "name": "generalizability",
+      "severity": "critical"
+    },
+    {
+      "lens_id": 7,
+      "name": "positioning",
+      "severity": "major"
+    },
+    {
+      "lens_id": 8,
+      "name": "reproducibility",
+      "severity": "major"
+    }
+  ],
+  "synthesis": {
+    "tldr_verdict": "BUILD ON WITH FLAGS \u2014 paper is the direct source of RPM in user's Missing Types subproject; has 1 critical + 8 major defects that should be inherited as explicit caveats.",
+    "top_5_questions_anchor": "See briefing \u00a7 Top 5 killer questions",
+    "recommendation": "build-on-with-flags"
+  },
+  "transcript": [],
+  "moderator_assessments": [],
+  "compaction_history": [],
+  "spawn_count": 0,
+  "spawn_budget": 80,
+  "wall_clock_start": "2026-04-23T17:39:22.166015Z",
+  "wall_clock_budget_s": 1800,
+  "abort_reason": null,
+  "moderator_own_context_est_chars": 0,
+  "run_status": "completed",
+  "started_at": "2026-04-23T17:32:00Z",
+  "completed_at": "2026-04-23T18:11:58.973415Z",
+  "classification_source": "reviewer",
+  "novelty_claims": [
+    "Semiparametric framework for event type probability using rate proportion method to impute missing event categories (never previously explored)",
+    "Log-odds formulation expressed as a generalized partially linear model: log{p_ij(t)/p_iJ(t)} = beta_0^T X_ij(t) + g_0j(t)",
+    "Cubic B-spline approximation for baseline log-rate ratios g_0j(t) enabling simultaneous parameter estimation via approximate log-likelihood",
+    "Proof of n^{1/2} convergence rate for beta_0 estimator despite slower convergence of event type probability estimator p_ij(t)"
+  ]
+}

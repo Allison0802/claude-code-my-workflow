@@ -90,13 +90,23 @@ def check_g3a(state: dict) -> list[str]:
     lenses = state.get("lenses_completed", []) or []
     for i, lens in enumerate(lenses):
         lens_id = lens.get("lens_id", f"<index {i}>")
+        severity = lens.get("severity")
+        # Skipped lenses (severity='skipped' per predictive-ML weight matrix or abort path)
+        # are exempt from content gates — they have no debate to validate. They still must
+        # be recorded in lenses_completed with a non-empty one_line_finding (explaining why)
+        # and summary_for_compaction (so synthesis can reference them), but author_best_defense
+        # and a full transcript_slice don't apply because no Author was spawned.
+        is_skipped = severity == "skipped"
         slice_ = lens.get("transcript_slice") or []
-        if not isinstance(slice_, list) or len(slice_) < 3:
+        min_slice_len = 1 if is_skipped else 3
+        if not isinstance(slice_, list) or len(slice_) < min_slice_len:
             fails.append(
                 f"GATE G-3a FAIL: lens {lens_id} ({lens.get('name', '?')}) "
-                f"transcript_slice length {len(slice_) if isinstance(slice_, list) else 'N/A'} < 3"
+                f"transcript_slice length {len(slice_) if isinstance(slice_, list) else 'N/A'} < {min_slice_len}"
             )
-        for fld in ("one_line_finding", "author_best_defense", "summary_for_compaction"):
+        required_fields = ("one_line_finding", "summary_for_compaction") if is_skipped else \
+            ("one_line_finding", "author_best_defense", "summary_for_compaction")
+        for fld in required_fields:
             if not _nonempty_str(lens.get(fld)):
                 fails.append(
                     f"GATE G-3a FAIL: lens {lens_id} ({lens.get('name', '?')}) "
@@ -178,10 +188,19 @@ def check_g3c(state: dict) -> list[str]:
         for l in lenses
         if isinstance(l.get("transcript_slice"), list)
     )
-    if state.get("run_status") == "completed" and transcript_len < slice_total:
+    # Per M4 (2026-04-24 schema change), state.transcript is OPTIONAL — canonical
+    # per-lens turns live in lenses_completed[*].transcript_slice. Only enforce the
+    # length inequality if state.transcript is explicitly populated (non-empty list);
+    # absent/empty root transcript is acceptable as long as every lens has a valid slice.
+    if (
+        state.get("run_status") == "completed"
+        and transcript_len > 0
+        and transcript_len < slice_total
+    ):
         fails.append(
             f"GATE G-3c FAIL: transcript length={transcript_len} < "
-            f"sum(transcript_slice lengths)={slice_total}"
+            f"sum(transcript_slice lengths)={slice_total} "
+            f"(when root transcript is populated it MUST equal the concatenation of slices)"
         )
     return fails
 

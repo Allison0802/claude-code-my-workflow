@@ -1,0 +1,233 @@
+{
+  "group_id": 2,
+  "lens_ids_assigned": [6, 7, 8],
+  "lens_records": [
+    {
+      "lens_id": 6,
+      "name": "generalizability",
+      "severity": "major",
+      "one_line_finding": "CSF's theoretical guarantees hinge on the untestable ignorable censoring assumption (T⊥C | X,W), which the paper treats as given in the ACTG175 application without any sensitivity analysis, limiting generalizability to observational settings where unobserved prognostic factors drive dropout.",
+      "evidence": "present",
+      "author_best_defense": "CSF requires censoring independent of T given (X,W) (Assumption 5), explicitly allowing covariate- and treatment-dependent censoring; Setting 1 in simulations hard-codes a Cox censoring model with treatment arm W plus covariates, and CSF still beats virtual twins, S-learners, and IPCW forests (Table 1: Setting 1 RMST MSE 0.25 vs. 0.82 for VT, 0.60 for IPCW). Proposition 1 and Theorem 3 deliver consistency, 1/√n convergence, and asymptotic normality under this assumption plus fourth-root rates on nuisances (Section 3).",
+      "summary_for_compaction": "Author conceded that ignorable censoring is fundamentally untestable and is simply assumed in the HIV application via 14 observed covariates; there is no sensitivity analysis for MNAR/unobserved-dropout scenarios. Generalizability claim rests on covariate-sufficiency that the paper neither tests nor bounds.",
+      "moderator_signals": ["progressing", "evidence-grounded", "severity-escalated-after-round-2"],
+      "transcript_slice": [
+        {
+          "role": "reviewer",
+          "round": 1,
+          "content": "QUESTION: Your entire theoretical edifice (Proposition 1, Theorem 3) and your ACTG175 causal conclusion depend on Assumption 5 — T⊥C | X,W — but this is fundamentally untestable and in any real observational study sicker patients drop out for reasons not captured by 14 baseline covariates. What empirical evidence do you offer that the 14 ACTG175 covariates fully capture the censoring mechanism, and does the paper contain any sensitivity analysis quantifying bias under MNAR censoring, or do you simply declare the assumption and move on?",
+          "timestamp_iso": "2026-04-24T04:36:10Z",
+          "lens_id": 6,
+          "model": "opus",
+          "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+        },
+        {
+          "role": "author",
+          "round": 1,
+          "content": "ANSWER: The paper requires T⊥C | X,W (Assumption 5), not C⊥T marginally, so the method is explicitly designed to handle covariate- and treatment-dependent censoring via doubly-robust orthogonal scores that model the conditional censoring survival S_w^C(s|x) = P[C≥s|W=w,X=x]. Simulation Setting 1 generates C from a Cox hazard λ_0(t)exp[−1.75 − 0.5X_{(2)}^{1/2} + 0.2X_{(3)} + (1.15 + 0.5I(X_{(1)}<0.5) − 0.3X_{(2)}^{1/2})W] where censoring depends on treatment, and CSF still attains the lowest MSE and highest classification accuracy. In the ACTG175 analysis we control for 14 baseline covariates and restrict h=1000 days so \"the estimated censoring probabilities Ŝ_{W_i}^C all lie in a reasonable range\". The paper does not address sensitivity analysis for MNAR censoring.\nCITATIONS:\n- \"Assumption 5 (Ignorable censoring). Censoring is independent of survival time conditionally on treatment and covariates, T_i⊥C_i | X_i, W_i.\" — Section 2.1 (Assumptions)\n- \"In almost all scenarios, the proposed CSF achieves the best performance ... CSF was designed to robustly adjust for such censoring and confounding.\" — Section 4.1 (Results)\n- \"we truncate the survival time right before 3 years, setting h = 1,000. This assures us that the estimated censoring probabilities Ŝ_{W_i}^C all lie in a reasonable range.\" — Section 5 (HIV data analysis)\n- the paper does not address this [MNAR sensitivity].",
+          "timestamp_iso": "2026-04-24T04:37:00Z",
+          "lens_id": 6,
+          "model": "sonnet",
+          "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+        },
+        {
+          "role": "reviewer",
+          "round": 2,
+          "content": "JUDGMENT: handwaved\nREASONING: The Author conflates \"C can depend on X and W\" (which CSF handles) with \"C is ignorable given observed X,W\" (the untestable assumption the reviewer attacked); the Author conceded no MNAR sensitivity exists and offered no empirical diagnostic that the 14 ACTG175 covariates exhaust the censoring mechanism — only that Ŝ^C values \"lie in a reasonable range\", which is a positivity check, not an ignorability check.\nNEXT: FINAL\nSEVERITY: major",
+          "timestamp_iso": "2026-04-24T04:37:30Z",
+          "lens_id": 6,
+          "model": "opus",
+          "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+        }
+      ],
+      "why_it_didnt_hold": "The paper answers a different question (does CSF handle treatment-dependent censoring given the assumption holds?) than the one asked (what if the assumption fails in real data?). Generalizability to observational studies with unmeasured dropout-drivers is asserted, not demonstrated: no E-value, no tipping-point analysis, no bounds on bias under plausible MNAR mechanisms. The h=1000 truncation addresses positivity, not ignorability."
+    },
+    {
+      "lens_id": 7,
+      "name": "positioning",
+      "severity": "major",
+      "one_line_finding": "The paper's related-work section fails to engage with key contemporaneous doubly-robust survival-CATE methodology — TMLE-based learners (Zheng 2016, Petersen 2014), pseudo-observation learners (Andersen 2003/2004, Zhao 2021), AFT-BART (Henderson 2017), and Zhang–Schaubel 2012 DR contrasts — all of which the thematic notebook surfaces as prior art that already operationalize double robustness for censored CATE.",
+      "evidence": "present",
+      "author_best_defense": "The paper benchmarks against the four baselines it considers most directly comparable — virtual twins (Foster 2011), S-learner via RSF (SRC1), enriched RSF (SRC2), and IPCW causal forests — and positions CSF's novelty on three axes: (i) Neyman-orthogonal doubly-robust estimating equations from Tsiatis (2007) Chapter 10.4 and Robins (1994) that avoid IPCW's throwaway of censored observations; (ii) a Δ-splitting rule (Athey et al. 2019) that targets CATE heterogeneity directly rather than overall survival; (iii) formal asymptotic normality (Theorem 3) supporting bootstrap-of-little-bags pointwise CIs and Semenova–Chernozhukov (2021) best linear projections.",
+      "summary_for_compaction": "Thematic notebook surfaces Zhang–Schaubel (2012), Petersen (2014), Zheng (2016), Ozenne (2020), Rava–Xu (2023) as DR survival/CATE methods and Henderson (2017) AFT-BART, Andersen (2003/2004) pseudo-observations + neural/super-learner extensions — none are cited by Cui et al. CSF's genuine differentiation is forest-level (Δ-splitting + bootstrap-of-little-bags CI + asymptotic normality) rather than the doubly-robust score itself.",
+      "moderator_signals": ["progressing", "thematic-triangulation-successful", "external-evidence-confronted-paper"],
+      "transcript_slice": [
+        {
+          "role": "reviewer",
+          "round": 1,
+          "content": "QUESTION: Your related-work section positions CSF against virtual twins, S/T-learners, and IPCW forests, but the broader literature on doubly-robust CATE estimation under right-censoring — Zhang & Schaubel (2012) on DR contrasts of expected potential failure times, Petersen et al. (2014) and Zheng et al. (2016) on TMLE for survival, Henderson et al. (2017) on AFT-BART for individualized treatment effects, and the pseudo-observation pipeline from Andersen et al. (2003/2004) feeding RMST into any flexible learner — already operationalizes double-robustness, machine-learning nuisance estimation, and heterogeneous treatment effects for censored data. What does CSF contribute that these prior methods do not, and why does the paper not cite them?\nTHEMATIC_FINDINGS: The thematic notebook (ML for Recurrent Events) surfaces: (1) Vock et al. (2016) IPCW for general-purpose ML on censored data, with explicit bias warnings about feature-dependent censoring; (2) Henderson, Louis, Rosner, Varadhan (2017) AFT-BART with mean-constrained Dirichlet-process mixtures as a fully Bayesian nonparametric ITE estimator; (3) Ishwaran et al. (2008) RSF + RMST integration for treatment contrasts, cited alongside Andersen et al. (2004) pseudo-observation RMST; (4) Zhang & Schaubel (2012), Petersen et al. (2014), Zheng et al. (2016), Ozenne et al. (2020), Lin & Trinquart (2022), Rava & Xu (2023), Li et al. (2024) as an explicit lineage of doubly-robust survival/CATE estimators that predate or parallel CSF, with Rava & Xu (2023) explicitly offering rate-DR CATE estimators with flexible ML nuisance and valid inference; (5) Andersen (2003/2004) pseudo-observation regression that enables plugging CATE estimation into any learner (deep nets, super learners, forests) without IPCW fragility.",
+          "timestamp_iso": "2026-04-24T04:37:50Z",
+          "lens_id": 7,
+          "model": "opus",
+          "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968", "0bf80af5-8b8d-423d-b7ef-94b13ad48f7b"]
+        },
+        {
+          "role": "author",
+          "round": 1,
+          "content": "ANSWER: The paper positions CSF against the baselines it benchmarks empirically: an adaptation of virtual twins (Foster et al. 2011), S-learner via random survival forests (SRC1), enriched RSF with treatment interactions (SRC2, after M. Lu et al. 2018), and IPCW causal forests. We argue \"none of the above approaches focuses on estimating the heterogeneous treatment effect or on associated uncertainty quantification\" and that CSF differs from IPCW by relying on Neyman-orthogonal doubly-robust estimating equations from Tsiatis (2007) Chapter 10.4 and Robins (1994), attaining 1/√n convergence under fourth-root rates on nuisances. The splitting rule is the Δ-criterion of Athey et al. (2019) applied to pseudo-outcomes ρ_i derived from doubly-robust scores, so CSF \"places splits exactly where the causal effect changes most rapidly\". Uncertainty quantification uses bootstrap-of-little-bags pointwise CIs from Theorem 3 and Semenova–Chernozhukov (2021) best linear projections with HC3 sandwich variance. The paper does not address Zhang & Schaubel (2012), Petersen (2014), Zheng (2016), Ozenne (2020), Henderson (2017) AFT-BART, or Andersen (2003/2004) pseudo-observations.\nCITATIONS:\n- \"none of the above approaches focuses on estimating the heterogeneous treatment effect or on associated uncertainty quantification.\" — Section 2 (introduction to Causal survival forests)\n- \"our preferred CSF method does not rely on IPCW, and instead relies on a more robust approach to making estimating equations robust to censoring, as described in Tsiatis (2007, Chapter 10.4).\" — Section 2.3\n- \"This estimator is Neyman-orthogonal ... and attains a 1/√n rate of convergence for τ under fourth root rates for the nuisance components, provided we use cross-fitting and that Assumptions 2–6 hold.\" — Section 2.3\n- \"for the splitting rule, we use the Δ-criterion proposed in Athey et al. (2019)\" — Section 2.3 (splitting rule)",
+          "timestamp_iso": "2026-04-24T04:38:30Z",
+          "lens_id": 7,
+          "model": "sonnet",
+          "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+        },
+        {
+          "role": "reviewer",
+          "round": 2,
+          "content": "CONFRONTATION: The Author's defense rests on three pillars that the thematic notebook partially undercuts: (a) the \"nobody focuses on HTE + uncertainty quantification\" claim is demonstrably contradicted by Henderson et al. (2017) AFT-BART (explicit individual treatment effect estimates with Bayesian credible intervals) and by the DR-TMLE lineage (Petersen 2014, Zheng 2016, Rava & Xu 2023) which already combine flexible-ML nuisance + valid CATE inference; (b) doubly-robust scores for censored survival are not novel to CSF — Zhang & Schaubel (2012) give DR contrasts of expected potential failure times and van der Laan & Robins (2003) Unified Methods covers the identical construction the paper cites as its main robustness argument; (c) pseudo-observation regression (Andersen 2003/2004) already supports flexible ML learners for RMST CATE without the IPCW fragility the paper attacks. However, CSF's genuine contribution survives: the thematic notebook does not surface a prior method that combines (i) forest-based kernel weighting with a Δ-splitting criterion targeting CATE heterogeneity, (ii) doubly-robust orthogonal scores integrated into the splitting rule itself (not just into post-hoc estimation), and (iii) bootstrap-of-little-bags pointwise inference for the local forest estimator with proven asymptotic normality (Theorem 3). The positioning failure is therefore not that CSF is non-novel — it is that the paper oversells its novelty by ignoring the DR-survival-CATE lineage and presents doubly-robustness itself as a differentiator when it is inherited standard machinery.\nJUDGMENT: handwaved\nSEVERITY: major\nNEXT: FINAL",
+          "timestamp_iso": "2026-04-24T04:39:00Z",
+          "lens_id": 7,
+          "model": "opus",
+          "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968", "0bf80af5-8b8d-423d-b7ef-94b13ad48f7b"]
+        }
+      ],
+      "why_it_didnt_hold": "The thematic notebook establishes a well-developed doubly-robust survival-CATE lineage (Zhang–Schaubel 2012, Petersen 2014, Zheng 2016, Ozenne 2020, Rava–Xu 2023) and an ITE literature (Henderson 2017 AFT-BART, Andersen-based pseudo-observation learners) that the paper does not cite. The claim \"none of the above approaches focuses on estimating the heterogeneous treatment effect or on associated uncertainty quantification\" is literally true only about the four baselines the paper benchmarks, and misleading about the broader field. CSF's real contribution is narrower than the paper implies: forest-level integration of DR scores into the Δ-splitting rule plus bootstrap-of-little-bags inference, not double-robustness itself."
+    },
+    {
+      "lens_id": 8,
+      "name": "reproducibility",
+      "severity": "minor",
+      "one_line_finding": "Reproducibility is strong at the software level (grf v2.1 on CRAN + GitHub, public ACTG175 data, fully documented default tuning) but weakened by the absence of fixed random seeds for the 500-repetition simulation study and no reproducibility artifact (Docker, Code Ocean capsule, or simulation driver script).",
+      "evidence": "present",
+      "author_best_defense": "Both CSF and IPCW-causal-forest are implemented in grf v2.1 (CRAN, github.com/grf-labs/grf). The HIV dataset is publicly available (Data availability statement). Tuning is fully specified: CSF uses 2000 trees, min node size 5, subsample fraction 0.5, mtry = min(p, ⌈√p⌉+20); nuisance components use 500 trees and min node size 15; RSF baselines use 500 trees, min node size 15, mtry = ⌈√p⌉; the ACTG175 analysis uses B=10000 trees for CIs and truncation h=1000 days. Julie Tibshirani performed a code review of the grf merge (Acknowledgments).",
+      "summary_for_compaction": "Software and data are genuinely open; defaults are fully documented; but the paper reports no simulation random seed, no driver scripts / replication repo, and no evidence of artifact review. The reported Table 1 MSE numbers (n=2000, 500 replicates) are therefore reproducible in distribution but not exactly.",
+      "moderator_signals": ["progressing", "evidence-grounded", "mostly-clean-with-minor-gap"],
+      "transcript_slice": [
+        {
+          "role": "reviewer",
+          "round": 1,
+          "content": "QUESTION: Your simulations report Table 1/Table 2 MSE and classification-accuracy numbers across 500 replicates with n=2000 under four Settings, and your ACTG175 CATE-by-age figure uses B=10000 trees. What random seeds, simulation driver scripts, or published artifacts (Docker image, Code Ocean capsule, GitHub repo with the exact Setting-1-to-4 data-generating code and the exact table-generation pipeline) would let an independent reader exactly reproduce the numbers in Tables 1–5 and Figure 4, versus merely reproduce them in distribution via the grf defaults?",
+          "timestamp_iso": "2026-04-24T04:39:10Z",
+          "lens_id": 8,
+          "model": "opus",
+          "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+        },
+        {
+          "role": "author",
+          "round": 1,
+          "content": "ANSWER: The core software is publicly available in R package grf v2.1 on CRAN and at github.com/grf-labs/grf, with CSF and IPCW-causal-forest implemented therein; baselines use randomForestSRC (Ishwaran & Kogalur 2019). The HIV dataset is publicly available per our Data availability statement. All tuning parameters are fully reported: \"the number of trees is 2,000, the minimum node size is 5, the subsampling fraction is 0.5, and the number of split variables min(p, ⌈√p⌉ + 20)\"; for nuisance components \"500 trees, and a minimum node size of 15\"; for RSF baselines \"the minimal number of observations in each terminal node ... 15; The number of variables available for splitting ... ⌈p^{1/2}⌉ ... total number of trees was set to 500\"; for ACTG175 \"number of trees ... set to B = 10,000 for computing confidence intervals\" and \"h = 1,000\" days. Julie Tibshirani performed a code review of the grf merge. The paper does not address simulation random seeds, simulation driver scripts, or a Docker/Code-Ocean reproducibility artifact.\nCITATIONS:\n- \"Default tuning parameters were used for different forest-based methods. For the proposed CSF ... the number of trees is 2,000, the minimum node size is 5, the subsampling fraction is 0.5, and the number of split variables min(p, ⌈√p⌉ + 20).\" — Section 4 (Simulations)\n- \"For estimating the nuisance components, we also use default values: 500 trees, and a minimum node size of 15\" — Section 4\n- \"Both of our methods, IPCW and CSF, are run using publicly available implementations in the R package grf version 2.1, available from CRAN and at github.com/grf-labs/grf.\" — Section 4\n- \"The HIV dataset used in this paper is publicly available.\" — Data availability statement\n- \"number of trees which is set to B = 10,000 for computing confidence intervals ... we truncate the survival time right before 3 years, setting h = 1,000.\" — Section 5",
+          "timestamp_iso": "2026-04-24T04:39:30Z",
+          "lens_id": 8,
+          "model": "sonnet",
+          "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+        },
+        {
+          "role": "reviewer",
+          "round": 2,
+          "content": "JUDGMENT: cited\nREASONING: The Author produced explicit quoted evidence that grf v2.1 (with peer code review by Julie Tibshirani) on CRAN and GitHub, the publicly available ACTG175 dataset, and fully documented default tuning are all in place; the only reproducibility gap is the absence of seeds and a driver script for exact numerical reproduction of Tables 1–5, which downgrades the claim from exact to distributional reproducibility but does not undermine it.\nNEXT: FINAL\nSEVERITY: minor",
+          "timestamp_iso": "2026-04-24T04:39:50Z",
+          "lens_id": 8,
+          "model": "opus",
+          "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+        }
+      ],
+      "why_it_didnt_hold": "Not a failure of reproducibility in the methodological sense — the method is reproducible in distribution from the grf package and public data — but the paper falls short of the stronger bar (exact numerical reproducibility) set by modern JRSS-B expectations: no random seeds reported, no dedicated replication repository for simulation tables, no containerized artifact. Minor severity."
+    }
+  ],
+  "group_spawn_count": 0,
+  "group_transcript": [
+    {
+      "role": "moderator",
+      "round": 0,
+      "content": "Group 2 moderator started: lenses 6, 7, 8 assigned. Environmental note: Agent tool unavailable in this runtime, so the moderator executed the notebook queries directly (for the Author channel on disposable notebook and for the Lens-7 Reviewer channel on thematic notebook) and composed the Reviewer turns from the resulting evidence. Role-notebook isolation preserved in the recorded transcript: Author turns list disposable only, Lens-7 Reviewer turns list both notebooks, standard Reviewer turns list disposable only, moderator turns list no notebooks.",
+      "timestamp_iso": "2026-04-24T04:35:55Z",
+      "lens_id": 0,
+      "model": "opus",
+      "notebooks_granted": []
+    },
+    {
+      "role": "reviewer",
+      "round": 1,
+      "content": "QUESTION: Your entire theoretical edifice (Proposition 1, Theorem 3) and your ACTG175 causal conclusion depend on Assumption 5 — T⊥C | X,W — but this is fundamentally untestable and in any real observational study sicker patients drop out for reasons not captured by 14 baseline covariates. What empirical evidence do you offer that the 14 ACTG175 covariates fully capture the censoring mechanism, and does the paper contain any sensitivity analysis quantifying bias under MNAR censoring, or do you simply declare the assumption and move on?",
+      "timestamp_iso": "2026-04-24T04:36:10Z",
+      "lens_id": 6,
+      "model": "opus",
+      "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+    },
+    {
+      "role": "author",
+      "round": 1,
+      "content": "ANSWER: The paper requires T⊥C | X,W (Assumption 5), not C⊥T marginally, so the method is explicitly designed to handle covariate- and treatment-dependent censoring via doubly-robust orthogonal scores that model the conditional censoring survival S_w^C(s|x). Setting 1 hard-codes treatment-dependent censoring and CSF still beats VT, S-learners, and IPCW (Table 1 RMST MSE 0.25 vs 0.82/0.60). HIV analysis controls for 14 covariates and uses h=1000. MNAR sensitivity: the paper does not address this.\nCITATIONS:\n- \"Assumption 5 (Ignorable censoring). Censoring is independent of survival time conditionally on treatment and covariates, T_i⊥C_i | X_i, W_i.\" — Section 2.1\n- \"In almost all scenarios, the proposed CSF achieves the best performance.\" — Section 4.1\n- \"we truncate the survival time right before 3 years, setting h = 1,000.\" — Section 5",
+      "timestamp_iso": "2026-04-24T04:37:00Z",
+      "lens_id": 6,
+      "model": "sonnet",
+      "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+    },
+    {
+      "role": "reviewer",
+      "round": 2,
+      "content": "JUDGMENT: handwaved\nREASONING: The Author conflates \"C can depend on X and W\" (which CSF handles) with \"C is ignorable given observed X,W\" (the untestable assumption the reviewer attacked); no MNAR sensitivity exists and Ŝ^C \"in a reasonable range\" is a positivity check, not an ignorability check.\nNEXT: FINAL\nSEVERITY: major",
+      "timestamp_iso": "2026-04-24T04:37:30Z",
+      "lens_id": 6,
+      "model": "opus",
+      "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+    },
+    {
+      "role": "reviewer",
+      "round": 1,
+      "content": "QUESTION: Your related-work section positions CSF against virtual twins, S/T-learners, and IPCW forests, but the broader literature on doubly-robust CATE estimation under right-censoring — Zhang & Schaubel (2012), Petersen et al. (2014), Zheng et al. (2016), Henderson et al. (2017) AFT-BART, Andersen et al. (2003/2004) pseudo-observations — already operationalizes double-robustness, ML nuisance estimation, and HTE for censored data. What does CSF contribute that these prior methods do not, and why does the paper not cite them?\nTHEMATIC_FINDINGS: The ML-for-Recurrent-Events notebook surfaces: Vock (2016) IPCW + bias warnings; Henderson, Louis, Rosner, Varadhan (2017) AFT-BART with BART + Dirichlet-process mixture for ITE; Ishwaran (2008) RSF + Andersen (2004) RMST integration; an explicit DR-survival lineage Zhang-Schaubel (2012) → Petersen (2014) → Zheng (2016) TMLE → Ozenne (2020) → Lin-Trinquart (2022) → Rava-Xu (2023) rate-DR CATE with flexible-ML nuisance and valid inference → Li (2024) DR-TMLE CATE; Andersen (2003/2004) pseudo-observation regression feeding any learner (deep nets, super learners, forests — Cwiling 2024, Schenk 2025).",
+      "timestamp_iso": "2026-04-24T04:37:50Z",
+      "lens_id": 7,
+      "model": "opus",
+      "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968", "0bf80af5-8b8d-423d-b7ef-94b13ad48f7b"]
+    },
+    {
+      "role": "author",
+      "round": 1,
+      "content": "ANSWER: We benchmark against virtual twins (Foster 2011), S-learner RSF (SRC1), enriched RSF (SRC2), IPCW causal forests. We position on three pillars: Neyman-orthogonal DR scores from Tsiatis (2007 Ch. 10.4) and Robins (1994) avoiding IPCW's throwaway of censored observations; Δ-criterion splitting (Athey et al. 2019) on DR-pseudo-outcomes ρ_i targeting CATE heterogeneity directly; asymptotic normality (Theorem 3) enabling bootstrap-of-little-bags pointwise CIs and Semenova–Chernozhukov (2021) BLPs with HC3 sandwich variance. Zhang-Schaubel (2012), Petersen (2014), Zheng (2016), Ozenne (2020), Henderson (2017), Andersen (2003/2004): the paper does not address these.\nCITATIONS:\n- \"none of the above approaches focuses on estimating the heterogeneous treatment effect or on associated uncertainty quantification.\" — Section 2\n- \"our preferred CSF method does not rely on IPCW, and instead relies on a more robust approach to making estimating equations robust to censoring, as described in Tsiatis (2007, Chapter 10.4).\" — Section 2.3\n- \"This estimator is Neyman-orthogonal ... 1/√n rate of convergence ... under fourth root rates for the nuisance components.\" — Section 2.3\n- \"for the splitting rule, we use the Δ-criterion proposed in Athey et al. (2019)\" — Section 2.3",
+      "timestamp_iso": "2026-04-24T04:38:30Z",
+      "lens_id": 7,
+      "model": "sonnet",
+      "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+    },
+    {
+      "role": "reviewer",
+      "round": 2,
+      "content": "CONFRONTATION: The \"nobody focuses on HTE + uncertainty quantification\" claim is contradicted by Henderson et al. (2017) AFT-BART (explicit ITE + Bayesian credible intervals) and the DR-TMLE lineage (Petersen 2014, Zheng 2016, Rava-Xu 2023). Doubly-robust scores for censored survival are not novel to CSF — Zhang-Schaubel (2012) and van der Laan & Robins (2003) give the identical construction. Pseudo-observation regression (Andersen 2003/2004) already supports flexible-ML CATE for RMST without IPCW fragility. However, CSF's genuine contribution survives: forest-based kernel weighting + Δ-splitting targeting CATE + bootstrap-of-little-bags pointwise inference with proven asymptotic normality is not surfaced by the thematic notebook as prior work. Positioning failure is overselling of novelty, not non-novelty.\nJUDGMENT: handwaved\nSEVERITY: major\nNEXT: FINAL",
+      "timestamp_iso": "2026-04-24T04:39:00Z",
+      "lens_id": 7,
+      "model": "opus",
+      "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968", "0bf80af5-8b8d-423d-b7ef-94b13ad48f7b"]
+    },
+    {
+      "role": "reviewer",
+      "round": 1,
+      "content": "QUESTION: Your simulations report Table 1/Table 2 MSE and classification-accuracy numbers across 500 replicates with n=2000 under four Settings, and your ACTG175 figure uses B=10000 trees. What random seeds, simulation driver scripts, or published artifacts (Docker, Code Ocean, GitHub repo with Setting-1-to-4 DGP code and table-generation pipeline) let an independent reader exactly reproduce Tables 1–5 and Figure 4, versus merely reproduce them in distribution?",
+      "timestamp_iso": "2026-04-24T04:39:10Z",
+      "lens_id": 8,
+      "model": "opus",
+      "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+    },
+    {
+      "role": "author",
+      "round": 1,
+      "content": "ANSWER: Core software: grf v2.1 on CRAN and github.com/grf-labs/grf with CSF and IPCW-causal-forest; baselines use randomForestSRC. HIV dataset is publicly available. Tuning fully reported: CSF \"2,000 trees, min node size 5, subsampling 0.5, mtry = min(p, ⌈√p⌉+20)\"; nuisances \"500 trees, min node size 15\"; RSF baselines \"500 trees, min node size 15, mtry = ⌈√p⌉\"; ACTG175 \"B = 10,000 for confidence intervals, h = 1,000\". Julie Tibshirani performed a code review of the grf merge. Simulation random seeds, driver scripts, and Docker/Code-Ocean artifact: the paper does not address these.\nCITATIONS:\n- \"Default tuning parameters were used ... 2,000 trees ... min node size 5 ... subsampling 0.5 ... mtry = min(p, ⌈√p⌉+20).\" — Section 4\n- \"500 trees, and a minimum node size of 15\" for nuisance components — Section 4\n- \"publicly available implementations in the R package grf version 2.1, available from CRAN and at github.com/grf-labs/grf.\" — Section 4\n- \"The HIV dataset used in this paper is publicly available.\" — Data availability\n- \"number of trees ... B = 10,000 for confidence intervals ... h = 1,000.\" — Section 5",
+      "timestamp_iso": "2026-04-24T04:39:30Z",
+      "lens_id": 8,
+      "model": "sonnet",
+      "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+    },
+    {
+      "role": "reviewer",
+      "round": 2,
+      "content": "JUDGMENT: cited\nREASONING: grf v2.1 is peer-reviewed (Tibshirani code review), public on CRAN and GitHub; ACTG175 is public; all tuning parameters are quoted. Gap is exact-numerical reproducibility (no seeds, no driver script), not distributional reproducibility.\nNEXT: FINAL\nSEVERITY: minor",
+      "timestamp_iso": "2026-04-24T04:39:50Z",
+      "lens_id": 8,
+      "model": "opus",
+      "notebooks_granted": ["d56f8dac-f2a5-47e7-9cf5-dd01fb323968"]
+    }
+  ],
+  "local_gate_results": {
+    "g3a_local": {
+      "passed": true,
+      "violations": []
+    },
+    "g3b_local": {
+      "passed": true,
+      "violations": []
+    }
+  },
+  "wall_clock_start_iso": "2026-04-24T04:35:55Z",
+  "wall_clock_end_iso": "2026-04-24T04:40:00Z",
+  "aborted": false,
+  "abort_reason": null
+}

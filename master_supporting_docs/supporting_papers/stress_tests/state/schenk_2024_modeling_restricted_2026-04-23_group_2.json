@@ -1,0 +1,221 @@
+{
+  "group_id": 2,
+  "lens_ids_assigned": [6, 7, 8],
+  "lens_records": [
+    {
+      "lens_id": 6,
+      "name": "generalizability",
+      "severity": "major",
+      "one_line_finding": "Simulation envelope is narrow (n=1000, p=16, independent Weibull censoring, tau in q50-q90 of observed times, no competing risks, no p>>n); no evidence supports the Introduction's 'large number of covariates compared to individuals' claim or the SUCCESS-A tau-at-ceiling regime.",
+      "evidence": "absent",
+      "author_best_defense": "Section 3 confirms: n=1000 train + 1000 test, p=16 (10 signal + 5 noise + 1 treatment), censoring 'generated independently of the survival times, using the same Weibull model with eta_i(t)=0' at 25/50/75% rates, tau drawn from {q50, q60, q70, q80, q90} of observed times, no competing-risks DGP, and no high-dimensional scenario. The Introduction markets large-p/small-n settings but the simulation does not evaluate that regime.",
+      "summary_for_compaction": "Generalizability lens: PVRF is validated on a single narrow operating envelope (Weibull DGP, independent censoring, n=1000, p=16, tau in q50-q90). Covariate-dependent censoring, competing risks, small-n (n<=300), p>>16 high-dimensional, and tau near the follow-up ceiling are all outside the simulation support. The SUCCESS-A application (n=3652, tau=5 years at Q3=5.5, max=5.5) lies outside the empirical envelope, and the Introduction's large-p/small-n selling point is never simulated. Severity major because PVRF is marketed for exactly the settings it is not tested in.",
+      "moderator_signals": [
+        "Author conceded all five probed axes (CD-censoring, small n, p>>n, competing risks, tau near ceiling).",
+        "Simulation envelope (n=1000, p=16, indep. censoring) does not cover the SUCCESS-A application (n=3652, tau at ceiling).",
+        "Introduction's 'large number of covariates compared to individuals' pitch has no simulation evidence.",
+        "Consistent with Lens 3 (methodology): the CD-censoring gap is structural and propagates here."
+      ],
+      "why_it_didnt_hold": "The paper's empirical support is confined to a single Weibull/Weibull DGP with completely independent censoring, fixed n=1000, and fixed p=16. Every regime that matters for the paper's own marketing claims and for its headline application is outside this support: CD-censoring (realistic in oncology trials), small-n (observational subgroups), p>>n (the Introduction's pitch), competing risks (cause-specific RMST), and tau at the observational ceiling (the SUCCESS-A choice). A 2024 ML-methods paper that does not probe a single one of these is not positioned to support the generalizability claims in its own abstract.",
+      "transcript_slice": [
+        {
+          "role": "reviewer",
+          "round": 1,
+          "content": "QUESTION: The paper's simulation DGPs use Weibull event times, independent (completely random) censoring calibrated to 25/50/75% censoring rates, fixed p=11-16 covariates, n=1000, and a pre-selected tau in the q50-q90 range of observed times -- and SUCCESS-A has n=3,652, p=10, tau at the follow-up ceiling. Where does the paper provide evidence that PVRF's bias, RMSE, and C-index behavior hold up outside this narrow operating envelope -- specifically under (a) covariate-dependent censoring, (b) small n (say n <= 300), (c) high-dimensional p >> 16 (e.g., p = 100, 500 with sparse signals), (d) competing-risks settings where a cause-specific RMST is the target, or (e) tau at or near the observational ceiling (the SUCCESS-A regime)?",
+          "timestamp_iso": "2026-04-24T03:51:20Z",
+          "lens_id": 6,
+          "model": "opus",
+          "notebooks_granted": []
+        },
+        {
+          "role": "author",
+          "round": 1,
+          "content": "ANSWER: the paper does not address this. All simulation evidence is confined to a single operating envelope: n=1000 training + n=1000 test, p=16 (10 signal + 5 noise + 1 treatment), Weibull events with Weibull independent censoring at 25/50/75% rates, and tau in {q50, q60, q70, q80, q90} of observed times. Covariate-dependent censoring, small-n (n<=300), high-dimensional p>>16, and competing risks are never simulated. The only extrapolation to n=3652 and tau at the follow-up ceiling is the SUCCESS-A demonstration, which provides no ground truth.\n\nCITATIONS:\n- 'each of size n = 1000' -- Section 3\n- 'censoring times were generated independently of the survival times, using the same Weibull model with eta_i(t) = 0' -- Section 3\n- 'three different censoring proportions (25%, 50%, 75%) and five different values of the time horizon tau. The latter were determined by the 50%, 60%, 70%, 80% and 90% quantiles of the observed times' -- Section 3\n- 'five continuous covariates ... five dichotomous covariates ... In addition, we considered a dichotomous treatment variable ... Furthermore, we added five independent standard normally distributed noise variables' -- Section 3 (p=16 total)\n- 'particularly convenient method for applications involving a large number of covariates compared to the number of individuals' -- Section 2.2 (claim not simulated)\n- 'Methods to adjust RMST estimation for covariate-dependent censoring have been studied in Rong et al. [15]' -- Section 6 (referenced but not implemented or simulated)",
+          "timestamp_iso": "2026-04-24T03:52:10Z",
+          "lens_id": 6,
+          "model": "sonnet",
+          "notebooks_granted": ["c7b7c41a-40f0-4cd4-b271-f5687419b0e0"]
+        },
+        {
+          "role": "reviewer",
+          "round": 2,
+          "content": "JUDGMENT: conceded\nREASONING: The Author explicitly conceded that (a) CD-censoring is not simulated (censoring generated with eta_i(t)=0), (b) competing risks are not simulated, (c) p>>n is not simulated though the Introduction markets exactly that regime, (d) small-n (n<=300) is not simulated, and (e) no simulation evidence is provided for tau at or near the follow-up ceiling. The generalizability envelope that matters for the SUCCESS-A application and for the Introduction's selling points lies entirely outside the simulation support.\nNEXT: FINAL\nSEVERITY: major",
+          "timestamp_iso": "2026-04-24T03:52:40Z",
+          "lens_id": 6,
+          "model": "opus",
+          "notebooks_granted": []
+        },
+        {
+          "role": "moderator",
+          "round": 2,
+          "content": "Signal: Author conceded on all five probed axes of the generalizability envelope; depth-2 budget does not require a follow-up when judgment is 'conceded'. Decision: close lens at severity=major. Reasoning: the gap between the paper's marketing envelope (large-p, causal, flexible) and the simulation envelope (n=1000, p=16, indep. censoring, Weibull, no competing risks, interior tau) is the substantive generalizability failure.",
+          "timestamp_iso": "2026-04-24T03:52:50Z",
+          "lens_id": 6,
+          "model": "opus",
+          "notebooks_granted": []
+        }
+      ]
+    },
+    {
+      "lens_id": 7,
+      "name": "positioning",
+      "severity": "major",
+      "one_line_finding": "The paper cites Mogensen & Gerds (2013) and Schenk & Berger (2024) only as generic grounding; it never writes a delta paragraph differentiating PVRF's estimand (RMST via KM-jackknife) from Mogensen & Gerds' CIF-via-Aalen-Johansen forest, nor PVRF's forest ensemble from Schenk & Berger's single-tree architecture on the same SUCCESS-A dataset.",
+      "evidence": "present",
+      "author_best_defense": "Reference list includes [11] U. B. Mogensen and T. A. Gerds (2013) Stat Med 32:3102-3114 and [27] A. Schenk, M. Berger, M. Schmid (2024) Lifetime Data Analysis 30:439-471. Both cited as generic support: 'combining pseudo-value modeling [9] with random forest regression [10, 11]' (Section 1); 'conventional modeling techniques like linear regression or decision trees [27]' (Section 2.1); 'extend our approach to ... gradient boosting [27] or deep neural networks' (Section 6).",
+      "summary_for_compaction": "Positioning lens (novelty-check score 5.5, PROCEED WITH CAUTION): PVRF inherits the Mogensen & Gerds (2013) mechanism wholesale - jackknife pseudo-values fed to an off-the-shelf random forest regressor with node-variance splits - changing only the substrate (KM instead of Aalen-Johansen) and the estimand (RMST instead of CIF). The paper cites Mogensen & Gerds but provides no passage contrasting the two approaches, and identically cites Schenk & Berger (2024, same first author, same SUCCESS-A dataset) only as generic background. Severity major because the priors are cited without differentiation - not fabricated absence (which would be critical), not properly differentiated (which would be clean).",
+      "moderator_signals": [
+        "Novelty-check got the first author of the 2013 prior work wrong (Sachs instead of Mogensen) but correctly identified 'very high' mechanism overlap.",
+        "Thematic query confirmed: Mogensen & Gerds 2013 already proposed 'replace the censored event status by a jackknife pseudo-value' + 'random forests for uncensored data' + 'node variance ... as split criterion' - the exact PVRF mechanism.",
+        "Same first author as Schenk & Berger (2024) analyzing the same SUCCESS-A dataset is never flagged in the paper.",
+        "Author conceded in round 2 that no differentiation paragraph exists for either prior work.",
+        "The methodological delta is mechanical: swap Aalen-Johansen for KM, swap single-tree for forest. No novel theoretical contribution is articulated."
+      ],
+      "why_it_didnt_hold": "PVRF is essentially Mogensen & Gerds (2013) with the estimand changed from CIF to RMST, and Schenk & Berger (2024) with the architecture changed from a single tree to a forest. The paper cites both priors but never differentiates them, never motivates why the substitution is methodologically nontrivial, and never runs a head-to-head empirical comparison. For a journal submission in 2024, this is the minimum positioning deliverable a referee would expect; its absence makes the contribution look incremental in a way the Abstract does not acknowledge.",
+      "transcript_slice": [
+        {
+          "role": "reviewer",
+          "round": 1,
+          "content": "QUESTION: The novelty-check identifies 'Sachs & Gerds (2013)' [actually Mogensen & Gerds (2013), Stat. Med. 32:3102-3114] as 'very high overlap' - same mechanism (jackknife pseudo-values fed to a random forest regressor) applied to competing-risks CIF, and Schenk & Berger (2024, Lifetime Data Analysis) as 'high overlap' - same first author, pseudo-value regression trees on the same SUCCESS-A breast-cancer dataset. Where in the paper does the author team explicitly cite Mogensen & Gerds (2013) and Schenk & Berger (2024), and explicitly differentiate PVRF's methodological contribution from those two works? Merely generalizing Mogensen & Gerds from CIF to RMST, or swapping the tree-building algorithm from Schenk & Berger's single-tree CART to a forest, is an incremental methodological move that demands a precise delta statement rather than a silent substitution.\n\nTHEMATIC_QUERY: Sachs Gerds 2013 random forest competing risks pseudo-values; pseudo-value regression tree Schenk Berger 2024; pseudo-observations machine learning RMST forest prior work - compare method contributions across these works.",
+          "timestamp_iso": "2026-04-24T03:53:00Z",
+          "lens_id": 7,
+          "model": "opus",
+          "notebooks_granted": ["0bf80af5-8b8d-423d-b7ef-94b13ad48f7b"]
+        },
+        {
+          "role": "moderator",
+          "round": 1,
+          "content": "THEMATIC_QUERY_RESULT: Thematic notebook confirms the correct attribution is Mogensen & Gerds (2013) Stat Med 32:3102-3114 (not 'Sachs & Gerds' as the novelty-check had it). Mogensen & Gerds proposed exactly PVRF's core mechanism: 'replace the censored event status by a jackknife pseudo-value' + 'apply an implementation of random forests for uncensored data' + 'node variance is chosen as split criterion for growing regression trees'. Differences from PVRF are mechanical: (i) Mogensen & Gerds target the CIF (cumulative incidence for a specific cause) using Aalen-Johansen-based pseudo-values; PVRF targets RMST using Kaplan-Meier-based pseudo-values. (ii) Mogensen & Gerds use standard random forests with node variance; PVRF additionally evaluates partykit's conditional inference forest and recommends it. The thematic notebook also confirms Schenk & Berger (2024) 'formally developed pseudo-value regression trees' as single-tree architecture on pseudo-values.",
+          "timestamp_iso": "2026-04-24T03:53:30Z",
+          "lens_id": 7,
+          "model": "opus",
+          "notebooks_granted": ["0bf80af5-8b8d-423d-b7ef-94b13ad48f7b"]
+        },
+        {
+          "role": "author",
+          "round": 1,
+          "content": "ANSWER: Both prior works are cited but not explicitly differentiated. Mogensen & Gerds (2013) appears as reference [11] and is invoked only as general grounding for combining pseudo-values with random forests: 'Our method is characterized by a non-parametric approach combining pseudo-value modeling [9] with random forest regression [10, 11]' (Section 1) and 'we propose to model individual RMSTs by using the pseudo-values ... as continuous outcome variable in a random forest regression model [10, 11]' (Section 2.2). Schenk, Berger & Schmid (2024) appears as reference [27] as justification for using decision trees with pseudo-values: 'conventional modeling techniques like linear regression or decision trees [27]' (Section 2.1), and as one of several possible extensions in the Discussion: 'extend our approach to other statistical modeling or machine learning techniques, e.g. to gradient boosting [27] or deep neural networks' (Section 6). The paper provides no passage contrasting PVRF's estimand (RMST via KM-jackknife) against Mogensen & Gerds' estimand (CIF via Aalen-Johansen-jackknife), nor PVRF's forest ensemble against Schenk & Berger's single-tree architecture, nor any empirical head-to-head comparison with either prior.\n\nCITATIONS:\n- '[11] U. B. Mogensen and T. A. Gerds. A random forest approach for competing risks based on pseudo-values. Statistics in Medicine, 32:3102-3114, 2013.' -- Reference list\n- '[27] A. Schenk, M. Berger, and M. Schmid. Pseudo-value regression trees. Lifetime Data Analysis, 30:439-471, 2024.' -- Reference list\n- 'Our method is characterized by a non-parametric approach combining pseudo-value modeling [9] with random forest regression [10, 11]' -- Section 1\n- 'we propose to model individual RMSTs by using the pseudo-values theta_i(tau) as continuous outcome variable in a random forest regression model [10, 11]' -- Section 2.2\n- 'facilitating the application of conventional modeling techniques like linear regression or decision trees [27]' -- Section 2.1\n- 'extend our approach to other statistical modeling or machine learning techniques, e.g. to gradient boosting [27] or deep neural networks [34, 51]' -- Section 6",
+          "timestamp_iso": "2026-04-24T03:54:00Z",
+          "lens_id": 7,
+          "model": "sonnet",
+          "notebooks_granted": ["c7b7c41a-40f0-4cd4-b271-f5687419b0e0"]
+        },
+        {
+          "role": "reviewer",
+          "round": 2,
+          "content": "CONFRONTATION: The thematic-notebook query confirms that Mogensen & Gerds (2013, Stat. Med. 32:3102-3114) already proposed the exact mechanism PVRF now deploys: 'replace the censored event status by a jackknife pseudo-value' and then apply 'an implementation of random forests for uncensored data' with 'node variance ... chosen as split criterion for growing regression trees' (Mogensen & Gerds 2013 abstract; confirmed in thematic notebook). The only methodological delta in PVRF is (i) swapping Aalen-Johansen-based CIF pseudo-values for Kaplan-Meier-based RMST pseudo-values -- a substitution that follows trivially from the estimand change -- and (ii) optionally using partykit's conditional inference forest instead of ranger's CART. The Author's defense confirms that PVRF cites Mogensen & Gerds only as generic grounding ('combining pseudo-value modeling with random forest regression'), never as a prior method to be differentiated from. Similarly, Schenk & Berger (2024) -- same first author, same SUCCESS-A dataset -- is cited only as justification for using decision trees with pseudo-values, and as a generic 'gradient boosting' extension option. The paper never writes a delta paragraph of the form 'Unlike Mogensen & Gerds, PVRF targets RMST rather than CIF and uses KM- rather than Aalen-Johansen-based pseudo-values; unlike Schenk & Berger, PVRF uses a forest ensemble rather than a single tree.' The omission is particularly striking given the shared first author with Schenk & Berger (2024) and the shared SUCCESS-A application.",
+          "timestamp_iso": "2026-04-24T03:54:30Z",
+          "lens_id": 7,
+          "model": "opus",
+          "notebooks_granted": []
+        },
+        {
+          "role": "author",
+          "round": 2,
+          "content": "ANSWER: the paper does not address this. No passage explicitly differentiates PVRF from Mogensen & Gerds (2013) -- the CIF-vs-RMST estimand contrast and the Aalen-Johansen-vs-Kaplan-Meier pseudo-value substrate difference are never drawn. No passage explicitly differentiates PVRF from Schenk & Berger (2024) -- the single-tree-vs-forest-ensemble contrast is never drawn, and the shared SUCCESS-A dataset is never flagged. Both references appear only as generic background.\n\nCITATIONS:\n- 'combining pseudo-value modeling [9] with random forest regression [10, 11]' -- Section 1 (generic grounding only)\n- 'conventional modeling techniques like linear regression or decision trees [27]' -- Section 2.1 (generic grounding only)\n- 'extend our approach to other statistical modeling or machine learning techniques, e.g. to gradient boosting [27] or deep neural networks' -- Section 6 (generic extension example)",
+          "timestamp_iso": "2026-04-24T03:55:00Z",
+          "lens_id": 7,
+          "model": "sonnet",
+          "notebooks_granted": ["c7b7c41a-40f0-4cd4-b271-f5687419b0e0"]
+        },
+        {
+          "role": "reviewer",
+          "round": 3,
+          "content": "JUDGMENT: conceded\nREASONING: The Author's second answer confirmed verbatim that the paper contains no passage differentiating PVRF's estimand and mechanism from Mogensen & Gerds (2013) or Schenk & Berger (2024). Both priors are cited only as generic grounding. Under close_lens_mode I close the lens.\nNEXT: FINAL\nSEVERITY: major",
+          "timestamp_iso": "2026-04-24T03:55:30Z",
+          "lens_id": 7,
+          "model": "opus",
+          "notebooks_granted": []
+        },
+        {
+          "role": "moderator",
+          "round": 3,
+          "content": "Signal: Author conceded the positioning gap twice across two confrontation turns; thematic notebook independently confirmed Mogensen & Gerds (2013) is the direct mechanistic precursor. Decision: close lens at severity=major. Reasoning: the priors are cited (so not critical) but not differentiated (so not clean or minor). Novelty-check score 5.5 + missing delta paragraph is a major positioning failure for a 2024 Stat Med paper.",
+          "timestamp_iso": "2026-04-24T03:55:40Z",
+          "lens_id": 7,
+          "model": "opus",
+          "notebooks_granted": []
+        }
+      ]
+    },
+    {
+      "lens_id": 8,
+      "name": "reproducibility",
+      "severity": "major",
+      "one_line_finding": "R version and package versions are pinned and tree hyperparameters specified, but the paper lacks random seeds, the mtry tuning grid, a permanent code repository (code lives on a rot-prone institutional cloud URL), the DGP coefficient values (offloaded to that same URL), and any variance/CI procedure for PVRF predictions or the g-computation contrast.",
+      "evidence": "present",
+      "author_best_defense": "Pinned: R 4.1.2; pseudo 1.4.3; ranger 0.15.1; partykit 1.2.20; simstudy 0.7.1; survival 3.5.7; geepack 1.3.9; iml 0.11.2. Hyperparameters: ntree=500, CART minsplit=5, cforest minsplit=20 with min leaf=7, mtry via 5-fold CV. 100 Monte Carlo replications, tau in {q50, q60, q70, q80, q90}. 5-fold CV WRSS with KM-based IPC weights for application evaluation.",
+      "summary_for_compaction": "Reproducibility lens: Partial compliance. Positives: R version, all 8 R package versions, tree hyperparameters (ntree, minsplit, leaf size), number of Monte Carlo replications, tau quantile choice, IPCW-WRSS evaluation. Gaps: (1) R code hosted on University of Bonn institutional cloud (link-rot risk, no commit hash, no DOI); (2) DGP coefficient values delta_j, psi_lm, phi_rs only in that R code, not tabulated in the paper; (3) random seeds never stated for simulation or SUCCESS-A; (4) mtry tuning grid not disclosed; (5) no variance estimator or CI procedure for PVRF predictions or g-computation contrast, explicitly punted to future work; (6) 102-patient SUCCESS-A complete-case exclusion not characterized. Severity major because the missing variance procedure and missing seeds together prevent both bit-exact reproduction and any inferential use.",
+      "moderator_signals": [
+        "Versions pinned comprehensively - strong positive signal.",
+        "Institutional cloud URL (imbie.uni-bonn.de/cloud) for code is a known link-rot risk; Stat Med requires permanent archival.",
+        "DGP coefficient values offloaded to that URL instead of tabulated; unversioned external R code is the only source of truth.",
+        "No random seeds anywhere - fails elementary reproducibility for a Monte Carlo methods paper.",
+        "No CI/variance procedure at all; explicitly deferred to future work with a bootstrap suggestion.",
+        "Consistent with Lens 3 (methodology): variance-estimation gap is structural, not just documentation."
+      ],
+      "why_it_didnt_hold": "A 2024 methods paper needs three things to be reproducible: (a) permanent code hosting with version pinning (missing - Bonn cloud URL is not permanent), (b) seeded Monte Carlo and application runs (missing - no seeds mentioned), and (c) an inferential procedure so downstream users can apply the method (missing - no variance, no CI, no test). The paper has strong package-version pinning and full hyperparameter disclosure (except the mtry grid), which is why this is major rather than critical; but the missing seeds + missing inference + institutional-cloud code together block both exact replication and downstream use.",
+      "transcript_slice": [
+        {
+          "role": "reviewer",
+          "round": 1,
+          "content": "QUESTION: For a 2024 methods paper proposing a new estimator (PVRF) with g-computation-style treatment contrasts applied to SUCCESS-A, what concrete reproducibility artifacts does the paper commit to? Specifically: (a) is simulation R code posted at a permanent repository with version/commit pinning (not an institutional cloud link that may rot), (b) are exact package versions (randomForestSRC, party/partykit, prodlim, pseudo, etc.) declared, (c) are random seeds fixed for each Monte Carlo scenario and for the SUCCESS-A analysis, (d) are the tuning grids for mtry/ntree/minsplit and the cross-validation procedure fully specified, (e) is a variance-estimation / confidence-interval procedure provided for PVRF predictions and the g-computation contrast, and (f) can the SUCCESS-A analysis be re-derived (patient exclusions, covariate coding, tau selection) from what is in the paper?",
+          "timestamp_iso": "2026-04-24T03:56:00Z",
+          "lens_id": 8,
+          "model": "opus",
+          "notebooks_granted": []
+        },
+        {
+          "role": "author",
+          "round": 1,
+          "content": "ANSWER: The paper provides partial reproducibility. Pinned: R 4.1.2; pseudo 1.4.3 (for jackknife pseudo-values via pseudomean); ranger 0.15.1 (CART forest); partykit 1.2.20 (conditional inference forest via cforest); simstudy 0.7.1 (DGP); survival 3.5.7 (Cox/Lognormal/Reference); geepack 1.3.9 (GEE); iml 0.11.2 (Shapley values). Hyperparameters: ntree=500 for both forests; CART random forest uses minsplit=5, no leaf or depth restriction, sampling fraction 0.632 without replacement; conditional forest uses minsplit=20, minimum 7 per leaf, same sampling fraction. mtry is 'tuned using five-fold cross validation' for both. Missing: (a) R code is hosted on an institutional cloud URL 'https://www.imbie.uni-bonn.de/cloud/index.php/s/6gmJQmayFAMJZHk', not GitHub/Zenodo; no commit hash, no DOI; (b) random seeds are never stated anywhere in Section 3, Appendix B, or Section 5; (c) the specific mtry grid evaluated in the 5-fold CV is not disclosed; (d) DGP coefficient values delta_j, psi_lm, phi_rs are sampled once from U(-1,1) but 'for the values of the coefficients ... we refer to the R code' -- not tabulated in the paper; (e) no analytic variance or confidence interval for PVRF predictions or the g-computation contrast is provided; (f) SUCCESS-A complete-case exclusion of 102 patients is stated but not characterized (no dropped-vs-retained comparison, no sensitivity analysis).\n\nCITATIONS:\n- 'The simulation study and the application were carried out in R, version 4.1.2. Data for the simulation study were generated using the R package simstudy, version 0.7.1. Pseudo values for the RMST ... were calculated using the pseudomean function of the R package pseudo, version 1.4.3. The CART random forest was implemented using the R package ranger, version 0.15.1. The number of trees was set to 500. ... The number of candidate split variables in each node (mtry) was tuned using five-fold cross validation. In each tree, the minimum number of observations required to perform an additional split was set to 5. There were no restrictions on the tree depth and the minimum number of observations in the leaf nodes.' -- Appendix B\n- 'The conditional random forest was implemented using cforest function of the R package partykit, version 1.2.20. The number of trees was set to 500. ... In each tree, a minimum of 20 observations was required to perform a split, and each leaf node was required to contain a minimum of 7 observations.' -- Appendix B\n- 'The R-code for the simulation study is available at https://www.imbie.uni-bonn.de/cloud/index.php/s/6gmJQmayFAMJZHk.' -- Appendix B\n- 'For the values of the coefficients delta_j, psi_lm and phi_rs, we refer to the R code at https://www.imbie.uni-bonn.de/cloud/index.php/s/6gmJQmayFAMJZHk.' -- Section 3\n- 'An important topic for future research is the development of hypothesis tests and confidence intervals for PVRF-based RMST differences. ... Confidence intervals for treatment contrasts could, e.g., be constructed using bootstrap methods, along the lines of Hernan & Robins [47], Chapter 13.' -- Section 6\n- 'Patients with missing values in any of the considered covariates were excluded from our anaylsis. The analyzed data comprised 3,652 patients.' -- Section 5",
+          "timestamp_iso": "2026-04-24T03:57:00Z",
+          "lens_id": 8,
+          "model": "sonnet",
+          "notebooks_granted": ["c7b7c41a-40f0-4cd4-b271-f5687419b0e0"]
+        },
+        {
+          "role": "reviewer",
+          "round": 2,
+          "content": "JUDGMENT: handwaved\nREASONING: The Author cited extensive pinning of R version and package versions and specified most hyperparameters, but conceded five reproducibility gaps: (1) no random seeds are fixed or reported anywhere; (2) the mtry tuning grid is not disclosed; (3) the R code is hosted on a University of Bonn institutional cloud (link-rot risk) rather than a permanent repository with commit hash or DOI, and DGP coefficient values live only in that code; (4) no variance estimator or confidence-interval procedure is provided for PVRF predictions or the g-computation contrast -- explicitly deferred to future work; (5) the SUCCESS-A complete-case exclusion of 102 patients is not characterized. For a 2024 methods paper proposing a new estimator applied to a clinical trial (SUCCESS-A), these gaps prevent bit-exact reproduction and any inferential use of the method. Handwaved judgment ordinarily maps to minor, but the combination of missing seeds + missing variance procedure + rot-prone code URL + offloaded DGP coefficients raises severity to major.\nNEXT: FINAL\nSEVERITY: major",
+          "timestamp_iso": "2026-04-24T03:57:30Z",
+          "lens_id": 8,
+          "model": "opus",
+          "notebooks_granted": []
+        },
+        {
+          "role": "moderator",
+          "round": 2,
+          "content": "Signal: Author gave strong positive evidence for versioning/hyperparameters and full concession on seeds/grid/CIs/code hosting. Decision: close lens at severity=major. Reasoning: handwaved -> minor by default, but the missing variance procedure is a structural methodological gap (not just documentation), which forces an upgrade to major. This aligns with the Lens 3 (methodology) finding that variance/CIs are deferred to future work.",
+          "timestamp_iso": "2026-04-24T03:57:45Z",
+          "lens_id": 8,
+          "model": "opus",
+          "notebooks_granted": []
+        }
+      ]
+    }
+  ],
+  "group_spawn_count": 8,
+  "group_transcript": [
+    {"role": "reviewer", "round": 1, "content": "QUESTION (Lens 6)", "timestamp_iso": "2026-04-24T03:51:20Z", "lens_id": 6, "model": "opus", "notebooks_granted": []},
+    {"role": "author", "round": 1, "content": "ANSWER (Lens 6)", "timestamp_iso": "2026-04-24T03:52:10Z", "lens_id": 6, "model": "sonnet", "notebooks_granted": ["c7b7c41a-40f0-4cd4-b271-f5687419b0e0"]},
+    {"role": "reviewer", "round": 2, "content": "JUDGMENT conceded (Lens 6)", "timestamp_iso": "2026-04-24T03:52:40Z", "lens_id": 6, "model": "opus", "notebooks_granted": []},
+    {"role": "moderator", "round": 2, "content": "Close Lens 6 severity=major", "timestamp_iso": "2026-04-24T03:52:50Z", "lens_id": 6, "model": "opus", "notebooks_granted": []},
+    {"role": "reviewer", "round": 1, "content": "QUESTION + THEMATIC_QUERY (Lens 7)", "timestamp_iso": "2026-04-24T03:53:00Z", "lens_id": 7, "model": "opus", "notebooks_granted": ["0bf80af5-8b8d-423d-b7ef-94b13ad48f7b"]},
+    {"role": "moderator", "round": 1, "content": "THEMATIC_QUERY_RESULT (Lens 7)", "timestamp_iso": "2026-04-24T03:53:30Z", "lens_id": 7, "model": "opus", "notebooks_granted": ["0bf80af5-8b8d-423d-b7ef-94b13ad48f7b"]},
+    {"role": "author", "round": 1, "content": "ANSWER (Lens 7 R1)", "timestamp_iso": "2026-04-24T03:54:00Z", "lens_id": 7, "model": "sonnet", "notebooks_granted": ["c7b7c41a-40f0-4cd4-b271-f5687419b0e0"]},
+    {"role": "reviewer", "round": 2, "content": "CONFRONTATION (Lens 7 R2)", "timestamp_iso": "2026-04-24T03:54:30Z", "lens_id": 7, "model": "opus", "notebooks_granted": []},
+    {"role": "author", "round": 2, "content": "ANSWER conceded (Lens 7 R2)", "timestamp_iso": "2026-04-24T03:55:00Z", "lens_id": 7, "model": "sonnet", "notebooks_granted": ["c7b7c41a-40f0-4cd4-b271-f5687419b0e0"]},
+    {"role": "reviewer", "round": 3, "content": "JUDGMENT conceded close_lens_mode (Lens 7)", "timestamp_iso": "2026-04-24T03:55:30Z", "lens_id": 7, "model": "opus", "notebooks_granted": []},
+    {"role": "moderator", "round": 3, "content": "Close Lens 7 severity=major", "timestamp_iso": "2026-04-24T03:55:40Z", "lens_id": 7, "model": "opus", "notebooks_granted": []},
+    {"role": "reviewer", "round": 1, "content": "QUESTION (Lens 8)", "timestamp_iso": "2026-04-24T03:56:00Z", "lens_id": 8, "model": "opus", "notebooks_granted": []},
+    {"role": "author", "round": 1, "content": "ANSWER (Lens 8)", "timestamp_iso": "2026-04-24T03:57:00Z", "lens_id": 8, "model": "sonnet", "notebooks_granted": ["c7b7c41a-40f0-4cd4-b271-f5687419b0e0"]},
+    {"role": "reviewer", "round": 2, "content": "JUDGMENT handwaved, severity major (Lens 8)", "timestamp_iso": "2026-04-24T03:57:30Z", "lens_id": 8, "model": "opus", "notebooks_granted": []},
+    {"role": "moderator", "round": 2, "content": "Close Lens 8 severity=major", "timestamp_iso": "2026-04-24T03:57:45Z", "lens_id": 8, "model": "opus", "notebooks_granted": []}
+  ],
+  "local_gate_results": {"g3a_local": {"passed": true, "violations": []}, "g3b_local": {"passed": true, "violations": []}},
+  "wall_clock_start_iso": "2026-04-24T03:51:13Z",
+  "wall_clock_end_iso": "2026-04-24T03:58:00Z",
+  "aborted": false,
+  "abort_reason": null
+}

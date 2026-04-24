@@ -1,0 +1,115 @@
+{
+  "schema_version": "2",
+  "paper": {
+    "title": "A Doubly Robust Censoring Unbiased Transformation",
+    "authors": ["Daniel Rubin", "Mark J. van der Laan"],
+    "year": 2007,
+    "source": "Missing Types/references/10.2202_1557-4679.1052.pdf",
+    "slug": "rubin_2007_doubly_robust_2026-04-24"
+  },
+  "invocation": {
+    "depth": 2,
+    "type_override": null,
+    "cross_check_override": null,
+    "skip_novelty": true,
+    "human_checkpoint": false
+  },
+  "notebooks": {
+    "disposable": {
+      "id": "c234d575-d0bf-4e9f-9279-599d22b8e3c8",
+      "name": "stress-test-rubin_2007_doubly_robust_2026-04-24",
+      "created_at": "2026-04-24T04:03:00-04:00",
+      "disposition": "kept",
+      "promoted_to": null
+    },
+    "thematic": {
+      "id": "0bf80af5-8b8d-423d-b7ef-94b13ad48f7b",
+      "name": "ML for Recurrent Events"
+    }
+  },
+  "detected_type": "new-estimator",
+  "classification_source": "reviewer",
+  "headline_claim": "A mapping introduced in another statistical context (van der Laan & Robins 2003, Ch. 3) is in fact a censoring unbiased transformation with a doubly robust property: it yields a valid surrogate response for nonparametric regression under right censoring if either the conditional survival function of the response or the censoring survival function is estimated accurately.",
+  "novelty_claims": [
+    "Doubly robust conditional mean structure: E[Y*(O)|W] = E[Y|W] whenever F-bar or G-bar is correctly specified.",
+    "Strengthening of van der Laan-Robins (2003) marginal-expectation result to a stronger conditional-expectation result (Theorem 1) - claimed as THE theoretical novelty.",
+    "Bridge from DR estimating equations to plug-in imputation for adaptive smoothers (e.g., smooth.spline), no modification required.",
+    "Simulation-demonstrated failure modes of IPCW (covariate-dependent censoring) and Buckley-James (omitted covariate) where the DR CUT still succeeds.",
+    "Empirical illustration on Stanford heart transplant data positioning DR-CUT as dominant over Buckley-James and Fan-Gijbels IPCW."
+  ],
+  "novelty_check": {
+    "status": "skipped",
+    "skip_reason": "Paper is 2007, published in International Journal of Biostatistics with established citations; novelty-check designed for unpublished/recent work would surface only descendants."
+  },
+  "lens_plan": [
+    {"lens_id": 0, "name": "data", "weight": "medium", "depth": 1},
+    {"lens_id": 1, "name": "estimand", "weight": "heavy", "depth": 2},
+    {"lens_id": 2, "name": "identification", "weight": "medium", "depth": 1},
+    {"lens_id": 3, "name": "methodology", "weight": "heavy", "depth": 2},
+    {"lens_id": 4, "name": "overclaims", "weight": "medium", "depth": 1},
+    {"lens_id": 5, "name": "alternatives", "weight": "light", "depth": 1},
+    {"lens_id": 6, "name": "generalizability", "weight": "heavy", "depth": 2},
+    {"lens_id": 7, "name": "positioning", "weight": "heavy", "depth": 2},
+    {"lens_id": 8, "name": "reproducibility", "weight": "medium", "depth": 1}
+  ],
+  "lenses_completed": [
+    {"lens_id": 0, "name": "data", "severity": "major", "judgment": "handwaved", "one_line_finding": "Stanford illustration vulnerable to post-baseline time-dependent confounding by transplant status; only a generic assumption-(1) caveat in Discussion.", "evidence": "partial", "why_it_didnt_hold": "Cox-on-age check falsifies age-dependent censoring but is silent on transplant-status-dependent censoring, which is the mechanism that would break assumption (1) for this dataset."},
+    {"lens_id": 1, "name": "estimand", "severity": "clean", "judgment": "cited", "one_line_finding": "Y is absorbed-notation for bounded/truncated transformation; Theorem 1 fixes tau as explicit assumption; Stanford fixes tau=3.26."},
+    {"lens_id": 2, "name": "identification", "severity": "minor", "judgment": "cited", "one_line_finding": "Assumption (1) {Y perp C | W} is explicit in intro and Theorem 1; Simulation 3 operationalizes the inadequate-W concern.", "evidence": "present", "why_it_didnt_fully_hold": "Stanford application does not justify Age as a sufficient conditioning set; general DR promise is well-stated in theory but unsupported in the worked example."},
+    {"lens_id": 3, "name": "methodology", "severity": "major", "judgment": "conceded", "one_line_finding": "No rate conditions, no Donsker/entropy, no cross-fitting, no efficient-IF argument - author quotes 'We have not derived consistency, rates of convergence, or the distribution theory'.", "evidence": "absent", "why_it_didnt_hold": "Practical usefulness claim rests on the smoother producing a good fit to Y-hat*; without any rate result this claim is informal."},
+    {"lens_id": 4, "name": "overclaims", "severity": "minor", "judgment": "cited", "one_line_finding": "Paper runs symmetric misspecification (Sim 2: G wrong; Sim 3: Q wrong), does NOT use 'dominance' language, and explicitly caveats outlier risk from 1/G-hat.", "evidence": "present"},
+    {"lens_id": 5, "name": "alternatives", "severity": "clean", "judgment": "cited", "one_line_finding": "k selected by minimizing Buckley-James LOO-CV, then reused for DR-CUT. Tuning asymmetry favors BJ."},
+    {"lens_id": 6, "name": "generalizability", "severity": "minor", "judgment": "conceded", "one_line_finding": "Scoped to single-event right-censored scalar Y. Competing risks, recurrent events, counting-process responses deferred to Rubin & van der Laan (2006) and vdL & Robins (2003).", "evidence": "partial", "why_it_didnt_fully_hold": "Scope is honestly declared, not hidden. Users who need competing risks or recurrent events must look elsewhere."},
+    {"lens_id": 7, "name": "positioning", "severity": "major", "judgment": "conceded", "one_line_finding": "Andersen, Klein & Rosthoj (2003) pseudo-observations established parallel conditional-expectation impute-then-smooth identity in Biometrika four years prior; paper does not cite it anywhere.", "evidence": "absent", "why_it_didnt_hold": "The 'conditional-expectation upgrade' novelty is weakened by a parallel conditional-expectation construction already existing in a major journal four years earlier."},
+    {"lens_id": 8, "name": "reproducibility", "severity": "minor", "judgment": "handwaved", "one_line_finding": "Math + DGPs + tuning + Stanford filters all explicit. Missing: MC replicate count, MC standard errors, seed. Single-run visual plots only.", "evidence": "partial", "why_it_didnt_fully_hold": "Reimplementation is feasible in principle; exact figure reproduction is not. By 2007 norms common; by 2026 under-reported."}
+  ],
+  "synthesis": {
+    "verdict": "The paper establishes a genuine, narrowly-scoped theoretical result: Y*_{F,G}(O) preserves E[Y*(O)|W]=E[Y|W] - a strict strengthening of the prior marginal identity under an explicit bounded-support / positivity setup. Simulations are symmetric misspecification stress tests, not straw-men. But three substantive gaps: Stanford illustration does not address time-dependent confounders; no rate/distribution theory for downstream smoother; positioning misses the parallel Andersen-Klein-Rosthoj (2003) pseudo-observation conditional-expectation identity published 4 years prior.",
+    "top_killer_questions": [
+      {"question": "Stanford heart transplant illustration conditions only on baseline Age, yet transplant status is a canonical time-dependent confounder; does the paper acknowledge that silent violation of assumption (1) via omitted time-dependent covariates makes both F-hat and G-hat misspecified in the same direction?", "lens_id": 0, "lens_name": "data", "severity": "major", "why_it_matters": "The paper's one worked empirical example is the primary evidence DR-CUT works in practice."},
+      {"question": "What rate conditions on F-hat and G-hat does the paper impose so the smoother fit to Y-hat* inherits a consistency / convergence rate? The author conceded: 'We have not derived consistency, rates of convergence, or the distribution theory'.", "lens_id": 3, "lens_name": "methodology", "severity": "major", "why_it_matters": "Any subsequent paper citing this for 'the DR smoother is consistent' is citing beyond what is proved."},
+      {"question": "Andersen, Klein & Rosthoj (2003) established a parallel conditional-expectation impute-then-smooth identity via pseudo-observations four years before this paper; it is not cited anywhere.", "lens_id": 7, "lens_name": "positioning", "severity": "major", "why_it_matters": "It is unsafe to cite DR-CUT as 'the' conditional-expectation imputation framework without acknowledging the parallel (and structurally simpler) pseudo-observation lineage."},
+      {"question": "The 'two chances at validity' framing is correct given W, but double robustness provides no protection when W itself is inadequate.", "lens_id": 2, "lens_name": "identification", "severity": "minor", "why_it_matters": "Applied users need to understand DR is robust over F/G, not over the choice of covariate set."},
+      {"question": "Simulations are presented as single-run visual plots; no MC replicate count, no MC standard errors, no seed.", "lens_id": 8, "lens_name": "reproducibility", "severity": "minor", "why_it_matters": "By 2026 standards under-reported; reproduction requires re-running with arbitrary choices."}
+    ],
+    "subproject_relevance": {
+      "Missing Types": {
+        "applies": "Partial - foundational reference for DR imputation family; NOT a direct methodological template.",
+        "data_match": "Poor. Rubin-vdL 2007 targets right-censoring of scalar Y | baseline W. Missing Types targets missing event-type labels for recurrent events with landmark FL-KM pseudo-observations.",
+        "warning": "Lens 7: Missing Types explicitly builds on pseudo-observations (Andersen-Klein-Rosthoj lineage) - cite BOTH Rubin-vdL 2007 (for DR-CUT identity) AND Andersen et al. 2003 (for pseudo-observation foundation); they are parallel, not hierarchical. Lens 3: downstream RF/GRF smoothers inherit the absent rate theory. Lens 6: for competing risks and recurrent events use Rubin & van der Laan (2006) or vdL & Robins (2003) Ch. 3.",
+        "missing_comparator": "Not a useful baseline for Missing Types - DGPs and estimands don't match. Keep as theoretical foundational reference."
+      },
+      "Comparisons": {
+        "applies": "Partial - cite as DR-CUT foundational reference; no direct method-comparison role.",
+        "data_match": "Poor. Comparisons targets recurrent competing risks with frailty x complexity x correlation x censoring; Rubin-vdL 2007 is single-event iid scalar Y.",
+        "warning": "Lens-3 caveat: the paper does not license downstream rate claims for RF/MERF/GRF smoothers.",
+        "missing_comparator": "Not a candidate baseline."
+      }
+    },
+    "recommendation": "flag",
+    "recommendation_rationale": "Severity tally is critical=0, major=3 (lenses 0,3,7), minor=4 (lenses 2,4,6,8), clean=2 (lenses 1,5). Mechanical rule: major >= 3 -> flag. The paper is correct within its narrow stated scope and honest about its limitations, but the three major findings mean it should be cited as foundational and narrowly-scoped, not as a universal DR-imputation framework. Pair citations with Andersen et al. (2003) and downstream rate/DR-TMLE work."
+  },
+  "transcript": [],
+  "moderator_assessments": [
+    {"lens_id": 0, "round": 1, "content": "R1 Author conceded the specific time-dependent confounding issue is not in the paper; defense rested on age-domain-knowledge argument and a generic Discussion caveat. Decision: close_lens at terminal; severity major."},
+    {"lens_id": 1, "round": 2, "content": "R2 judgment: cited/clean. Theorem 1 assumption of bounded Y + positivity explicit; Stanford tau=3.26 concrete."},
+    {"lens_id": 2, "round": 1, "content": "R1 Author's defense is strong and paper-grounded. Simulation 3 directly operationalizes the reviewer's concern. Close_lens at terminal; severity minor (Stanford application does not justify W fully)."},
+    {"lens_id": 3, "round": 2, "content": "R2 judgment: conceded/major. Author quoted the paper's explicit disclaimer of rate theory. Honest concession, substantive gap."},
+    {"lens_id": 4, "round": 1, "content": "R1 Author's defense is paper-grounded. Symmetric Sims 2 and 3 cover off-diagonals; explicit caveats on outlier risk. Terminal: cited/minor."},
+    {"lens_id": 5, "round": 1, "content": "R1 Author's defense directly refutes tuning asymmetry concern. Close_lens at terminal; severity clean."},
+    {"lens_id": 6, "round": 2, "content": "R2 judgment: conceded/minor. Scope is honestly declared; extensions cited to companion papers."},
+    {"lens_id": 7, "round": 1, "content": "R1 Author partially conceded: KSV/Leurgans cited but pseudo-observations NOT cited. Decision: continue to R2 confrontation."},
+    {"lens_id": 7, "round": 2, "content": "Confrontation path taken; Author conceded paper does not engage with pseudo-observation literature at all. Terminal: conceded/major."},
+    {"lens_id": 8, "round": 1, "content": "R1 Author defense is mixed: math and DGPs well specified but MC replicate count, SEs, and seed are absent. Terminal: handwaved/minor."}
+  ],
+  "compaction_history": [],
+  "spawn_count": 22,
+  "spawn_budget": 80,
+  "wall_clock_start": "2026-04-24T04:04:00-04:00",
+  "wall_clock_budget_s": 3600,
+  "abort_reason": null,
+  "moderator_own_context_est_chars": 45000,
+  "run_status": "completed",
+  "started_at": "2026-04-24T04:03:00-04:00",
+  "completed_at": "2026-04-24T04:58:00-04:00"
+}

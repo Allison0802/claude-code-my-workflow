@@ -17,6 +17,7 @@
     "lens_plan",
     "lenses_completed",
     "synthesis",
+    "transcript",
     "moderator_assessments",
     "spawn_count",
     "spawn_budget",
@@ -104,10 +105,6 @@
       "required": ["status"],
       "properties": {
         "status": { "type": "string", "enum": ["pending", "running", "completed", "failed", "skipped"] },
-        "skip_reason": {
-          "type": "string",
-          "description": "Canonical reason why novelty-check was skipped. Only populated when status == 'skipped'. See runbooks/phase-2-classify-plan.md §Step 2.5 for the enumerated reasons (user_flag, old_paper, already_cited, replication_run)."
-        },
         "runner_agent_id": { "type": ["string", "null"] },
         "started_at": { "type": ["string", "null"] },
         "completed_at": { "type": ["string", "null"] },
@@ -186,7 +183,7 @@
     },
     "transcript": {
       "type": "array",
-      "description": "OPTIONAL. Historically the root-level flat transcript, but the canonical per-lens transcripts now live in lenses_completed[*].transcript_slice. Runs should either populate this with the concatenation of all transcript_slice items OR omit the field entirely — never leave it as an empty array alongside non-empty slices (eval E4).",
+      "description": "Root transcript is a flat list of turns across all lenses. Every element must be a full turn record — no stubs.",
       "items": { "$ref": "#/definitions/turn_record" }
     },
     "moderator_assessments": {

@@ -1,0 +1,188 @@
+{
+  "schema_version": "2",
+  "paper": {
+    "title": "Estimating heterogeneous treatment effects with right-censored data via causal survival forests",
+    "authors": ["Yifan Cui", "Michael R. Kosorok", "Erik Sverdrup", "Stefan Wager", "Ruoqing Zhu"],
+    "year": 2023,
+    "source": "Missing Types/references/qkac001.pdf",
+    "slug": "cui_2023_estimating_heterogeneous_2026-04-24"
+  },
+  "invocation": {
+    "depth": 2,
+    "type_override": null,
+    "cross_check_override": null,
+    "skip_novelty": false,
+    "human_checkpoint": false,
+    "degradation_mode": "flat_in_moderator_dispatch",
+    "degradation_reason": "3x3 parallel group dispatch failed because general-purpose subagents lack the Agent tool needed to spawn nested Reviewer/Author sub-subagents. Groups 0 and 1 returned infrastructure-abort. Group 2 returned substantive content but group_spawn_count=0 suggests the subagent itself synthesized the content by direct notebook queries (protocol violation but content appears accurate — corroborates flat-dispatch findings). Top-level Moderator executed the 9 lens debates directly via 27 total sub-agent calls (9 Reviewer-R1 + 9 Author-R1 + 9 Reviewer-R2-judgment) in 3 serial parallel batches."
+  },
+  "notebooks": {
+    "disposable": {
+      "id": "d56f8dac-f2a5-47e7-9cf5-dd01fb323968",
+      "name": "stress-test-cui_2023_estimating_heterogeneous_2026-04-24",
+      "created_at": "2026-04-24T00:28:00-04:00",
+      "disposition": "kept",
+      "promoted_to": null
+    },
+    "thematic": {
+      "id": "0bf80af5-8b8d-423d-b7ef-94b13ad48f7b",
+      "name": "ML for Recurrent Events"
+    }
+  },
+  "detected_type": "causal-inference",
+  "classification_source": "reviewer",
+  "headline_claim": "Introduces causal survival forests (CSF): doubly-robust Neyman-orthogonal estimating equations from survival analysis integrated into the Athey et al. (2019) generalized random forest, estimating CATE on survival time (RMST or survival probability at horizon h) under right-censoring and unconfoundedness, with asymptotic normality + bootstrap-of-little-bags pointwise CIs + Best Linear Projection inference.",
+  "novelty_claims": [
+    "Integration of doubly-robust/AIPW estimating equations from survival analysis (Tsiatis 2007; van der Laan & Robins 2003) into the Athey et al. (2019) generalized random forest algorithm, avoiding the less-robust IPCW approach.",
+    "Direct targeting of CATE heterogeneity via a Delta-criterion splitting rule with pseudo-outcomes generated from DR scores (relabeling strategy at each parent node).",
+    "Asymptotic normality with 1/sqrt(n) rate for CSF predictions within the generalized random forest framework, with pointwise CIs via bootstrap-of-little-bags.",
+    "Best Linear Projection (Semenova & Chernozhukov 2021) inference adapted to censored CATE using AIPW scores with HC3 sandwich variance.",
+    "Production implementation as `causal_survival_forest` in the grf R/C++ package (CRAN; github.com/grf-labs/grf)."
+  ],
+  "novelty_check": {
+    "status": "completed",
+    "runner_agent_id": "a3d68aca21f83340a",
+    "started_at": "2026-04-24T00:30:00-04:00",
+    "completed_at": "2026-04-24T00:33:00-04:00",
+    "overall_score": 8,
+    "recommendation": "PROCEED",
+    "key_differentiator": "First method unifying (a) doubly-robust AIPW survival scores (not IPCW) as moment-equation target in a forest splitting rule, (b) direct CATE-heterogeneity targeting via Delta-criterion splitting on DR pseudo-outcomes, (c) valid GRF-theory asymptotic CIs for censored CATE.",
+    "closest_prior_work": [
+      {"paper": "Wager & Athey — Causal forests", "year": 2018, "venue": "JASA"},
+      {"paper": "Athey, Tibshirani & Wager — GRF", "year": 2019, "venue": "Ann. Stat."},
+      {"paper": "Hothorn & Bühlmann — Survival Ensembles", "year": 2006, "venue": "Biostatistics"},
+      {"paper": "Steingrimsson et al. — Doubly Robust Survival Trees", "year": 2016, "venue": "Stat. in Medicine"},
+      {"paper": "Zhang & Schaubel — DR survival CATE contrast", "year": 2012, "venue": "Biometrics"},
+      {"paper": "Petersen — Targeted MLE for censored CATE", "year": 2014, "venue": "various"},
+      {"paper": "Zheng — TMLE-based CATE on censored outcomes", "year": 2016, "venue": "various"},
+      {"paper": "Henderson — AFT-BART for ITE with credible intervals", "year": 2017, "venue": "JASA"},
+      {"paper": "Andersen et al. — Pseudo-observations for survival", "year": "2003/2004", "venue": "Biometrics / Biostatistics"},
+      {"paper": "Semenova & Chernozhukov — Debiased ML for CATE (BLP)", "year": 2021, "venue": "Econometrics J."},
+      {"paper": "Rava & Xu — Rate-DR CATE with ML inference under censoring", "year": 2023, "venue": "Stat. in Medicine"},
+      {"paper": "Li et al. — DR-TMLE CATE framework (concurrent to CSF)", "year": 2024, "venue": "arXiv"}
+    ]
+  },
+  "lens_plan": [
+    {"lens_id": 0, "name": "data", "weight": "medium", "depth": 1},
+    {"lens_id": 1, "name": "estimand", "weight": "heavy", "depth": 2},
+    {"lens_id": 2, "name": "identification", "weight": "heavy", "depth": 2},
+    {"lens_id": 3, "name": "methodology", "weight": "heavy", "depth": 2},
+    {"lens_id": 4, "name": "overclaims", "weight": "heavy", "depth": 2},
+    {"lens_id": 5, "name": "alternatives", "weight": "heavy", "depth": 2},
+    {"lens_id": 6, "name": "generalizability", "weight": "medium", "depth": 1},
+    {"lens_id": 7, "name": "positioning", "weight": "medium", "depth": 1},
+    {"lens_id": 8, "name": "reproducibility", "weight": "medium", "depth": 1}
+  ],
+  "lenses_completed": [
+    {
+      "lens_id": 0, "name": "data", "severity": "major",
+      "one_line_finding": "The paper's Assumption 5 (T ⊥ C | X, W) permits W-dependent censoring and is demonstrated in Setting 1's Cox censoring model, but the paper provides no formal bias expression for τ̂(x) under Assumption 5 violations, does not report realized censoring percentages in the simulation, and already shows 37-84% pointwise coverage at feature-space corners (x1, x4) under correctly specified censoring.",
+      "evidence": "present",
+      "author_best_defense": "Assumption 5 permits W-dependent censoring; the DR score has an explicit hazard ratio term λ̂_C_W(s|X)/Ŝ_C_W(s|X); ACTG175 uses h=1000 days so 'estimated censoring probabilities ... all lie in a reasonable range and suggest ... this identifying assumption holds' (Section 5). But: pointwise coverage is '37-84% at x1 and x4 across settings' (Table 3) under correct specification.",
+      "summary_for_compaction": "Author cited Assumption 5 but conceded: no formal bias bound for Assumption 5 violations, no realized censoring % in simulations, and already-degraded corner coverage. Severity: major.",
+      "moderator_signals": ["progressing", "conceded-key-subparts"],
+      "why_it_didnt_hold": "Paper does not quantify τ̂(x) bias when 20-30% of subjects are censored before h under a discontinuously shifting (treatment-arm-specific) censoring hazard. No sensitivity analysis is performed. The 37-84% corner coverage under correct Assumption 5 shows the method already has finite-sample frailties before any informative censoring is introduced."
+    },
+    {
+      "lens_id": 1, "name": "estimand", "severity": "minor",
+      "one_line_finding": "The paper's τ(x) = E[y(T(1)) - y(T(0)) | X=x] is formally defined under Assumption 1 (Finite Horizon), which forces y(t)=y(h) for t≥h; the grf implementation explicitly restricts to RMST and survival-probability differences. The only residual concern is that horizon h is manually set (e.g., h=1000 days for ACTG175).",
+      "evidence": "present",
+      "author_best_defense": "'Assumption 1 (Finite horizon). The outcome transformation y(·) admits a maximal horizon 0 < h < ∞, such that y(t) = y(h) for all t ≥ h' (Assumption 1). 'The implementation of our doubly robust method ... only considers two target outcomes: the RMST ... and the survival probability' (Remark 2). For ACTG175: 'we truncate the survival time right before 3 years, setting h = 1,000' (Section 5).",
+      "summary_for_compaction": "Reviewer attack partially misfired — paper's Finite Horizon assumption rules out the ill-defined raw-T-difference interpretation; implementation is explicitly restricted to RMST + survival probability. Hand-chosen h is a minor interpretive quibble. Severity: minor.",
+      "moderator_signals": ["progressing", "reviewer-partially-misfired"]
+    },
+    {
+      "lens_id": 2, "name": "identification", "severity": "major",
+      "one_line_finding": "The paper uses the weaker C ⊥ T | (X, W) assumption (Assumption 5 — ignorable censoring conditional on treatment and covariates); the W-conditioning is load-bearing (not cosmetic) because S_C_w(s|x) is estimated separately per treatment arm. However, the paper provides no sensitivity analysis and no bias bound for violations from unmeasured determinants of censoring.",
+      "evidence": "present",
+      "author_best_defense": "'Assumption 5 (Ignorable censoring). Censoring is independent of survival time conditionally on treatment and covariates, T_i ⊥ C_i | X_i, W_i' (Section 2). 'Provided Assumptions 2-6 hold, τ̂ - τ̃ = op(...)' — no sensitivity parameter for Assumption 5 failure is introduced anywhere.",
+      "summary_for_compaction": "Author conceded: no sensitivity analysis for Assumption 5 violations. Identification is internally consistent but relies on conditional ignorability being testable only via external clinical reasoning. Severity: major.",
+      "moderator_signals": ["progressing", "conceded"],
+      "why_it_didnt_hold": "In applied clinical RWE settings, unmeasured determinants of dropout (toxicity, clinical deterioration, post-baseline events) routinely drive informative censoring. The paper offers no E-value, tipping-point analysis, or MNAR bound. For a method pitched at observational causal inference, this is a material omission."
+    },
+    {
+      "lens_id": 3, "name": "methodology", "severity": "minor",
+      "one_line_finding": "The cross-product rate condition ‖ê-e‖·(‖Ŝ_C-S_C‖ + ‖Ŝ-S‖) = o_p(n^{-1/2}) is ASSUMED as a high-level regularity condition (Assumption 8) and verified by citation to Biau 2012, Wager-Walther 2015, Cui et al. 2022, Sun et al. 2019 — not proven in-paper. The β>1/4 rate for Ŝ_C under dependent censoring is outsourced to Cui et al. 2022.",
+      "evidence": "present",
+      "author_best_defense": "'Assumption 8 is quite general and can be achieved by many existing models. Biau (2012) and Wager and Walther (2015) show b_n^2 can be faster than n^{-2/(p+2)}... Cui et al. (2022) [shows] c_n^2 = n^{-1/(p+2)} is achievable for survival forest models...' The cross-product bound follows via Cauchy-Schwarz given cross-fitting.",
+      "summary_for_compaction": "Standard practice in semiparametric ML theory: rates assumed, verified by citation. But the specific cross-product under dependent-censoring-corrected Ŝ_C is plausibility-by-citation. Severity: minor.",
+      "moderator_signals": ["progressing", "standard-practice"]
+    },
+    {
+      "lens_id": 4, "name": "overclaims", "severity": "major",
+      "one_line_finding": "The 'outperforms baselines' claim is bounded to 4 forest-family baselines (Virtual Twins, S-learner RSF [SRC1], enriched RSF [SRC2], IPCW causal forests). No BART-for-survival, DeepSurv/DeepHit, Tian et al. modified-outcome, or AFT meta-learner. Censoring rates not stress-tested as percentages (20/50/80%); overlap never approaches 0.05/0.95. Setting 4 itself has IPCW (RMST) and SRC1 (survival prob) beating CSF.",
+      "evidence": "present",
+      "author_best_defense": "Author conceded all sub-parts: baselines are strictly forest-based; realized censoring % never reported; overlap kept well inside (0.25, 0.75); 'for setting 4 ... IPCW performs best ... SRC1 performs best' (Section 4.1).",
+      "summary_for_compaction": "Author fully conceded. Advantage of CSF is established over a narrow comparator set in moderate regimes. The headline claim 'CSF outperforms a number of baselines' is technically true but materially weaker than advertised. Severity: major.",
+      "moderator_signals": ["progressing", "fully-conceded"],
+      "why_it_didnt_hold": "The paper does not test CSF where it would be most stressed: high censoring (>50%), weak overlap (propensity near {0.05, 0.95}), and modern non-forest competitors (BART, deep HTE). Setting 4's baseline-best-at-one-estimand finding suggests the ranking is not uniform."
+    },
+    {
+      "lens_id": 5, "name": "alternatives", "severity": "major",
+      "one_line_finding": "The paper's own ACTG175 application found NO coefficients in the BLP significantly different from zero; the authors explicitly warn readers to 'exercise caution in interpreting heterogeneity' in those estimates. No parametric/Cox-interaction baseline is benchmarked. Whether CSF's apparent CATE variation is real effect modification or nuisance-estimation noise is not ruled out.",
+      "evidence": "present",
+      "author_best_defense": "'We regress the obtained doubly robust scores on all covariates ... [none significant] ... researchers should exercise caution in interpreting heterogeneity' (Section 5, BLP on ACTG175). Baselines are strictly forest-based; no Cox interaction model is benchmarked.",
+      "summary_for_compaction": "The paper's own real-data demonstration does not validate the method's core selling point (detecting CATE heterogeneity). No parametric alternative is shown to fail where CSF succeeds. Severity: major.",
+      "moderator_signals": ["progressing", "conceded"],
+      "why_it_didnt_hold": "For a method whose value proposition is 'discover heterogeneous treatment effects', failing to reject the null of no heterogeneity in the single real-data application — and explicitly conceding the CATE estimates are uncertain — undercuts the empirical narrative. A reader cannot distinguish real heterogeneity from forest-splitting noise driven by nuisance estimation."
+    },
+    {
+      "lens_id": 6, "name": "generalizability", "severity": "minor",
+      "one_line_finding": "Paper restricts to i.i.d. tuples {X, T, C, W} with single T and binary W; no extension to competing risks, recurrent events, or multi-arm treatments is offered or even discussed. The ACTG175 application explicitly restricts a four-arm trial to two arms.",
+      "evidence": "present",
+      "author_best_defense": "'Our statistical setting is specified in terms of the distribution of i.i.d. tuples {X_i, T_i, C_i, W_i} ∈ X × R+ × R+ × {0,1}' (Section 2). 'We focus on the subset of patients receiving the treatment ZDV+ddI or ddI monotherapy' (Section 5).",
+      "summary_for_compaction": "Scope is explicitly and honestly disclosed. Severity: minor (clearly scoped, not overclaimed). Still a real limitation for dissertation contexts involving recurrent events and competing risks.",
+      "moderator_signals": ["progressing", "clearly-scoped"]
+    },
+    {
+      "lens_id": 7, "name": "positioning", "severity": "major",
+      "one_line_finding": "Paper cites Steingrimsson et al. 2016/2019 honestly and pivots on 'none of these methods was directly targeted at heterogeneous treatment effects in observational studies'. BUT the DR-CATE-for-censored-survival lineage is broader than the paper acknowledges: Zhang-Schaubel 2012, Petersen 2014, Zheng 2016, Ozenne 2020, Henderson 2017 AFT-BART, Andersen 2003/2004 pseudo-obs + super learners, Rava-Xu 2023, Li 2024 DR-TMLE — none of these are cited in the paper. CSF's genuine novelty is narrower: the forest-level integration (Delta-criterion + GRF honesty + bootstrap-of-little-bags pointwise inference).",
+      "evidence": "present",
+      "author_best_defense": "'Steingrimsson et al. (2016) proposed doubly robust survival trees by constructing doubly robust loss functions that use more information to improve efficiency' ... 'none of these methods was directly targeted at heterogeneous treatment effects in observational studies' (Section 1.1). 'Our approach relies on orthogonal estimating equations to robustly adjust for both censoring and selection effects' (Abstract).",
+      "summary_for_compaction": "The paper's related-work section misses a substantial body of DR-CATE-on-censored-outcomes work (TMLE lineage + AFT-BART + pseudo-obs + ML). CSF is still novel, but the novelty is the specific combination of (a) forest-level DR-score splitting, (b) Delta-criterion for CATE heterogeneity, (c) GRF asymptotic theory + bootstrap-of-little-bags inference — not DR itself. Severity: major.",
+      "moderator_signals": ["progressing", "thematic-triangulation-surfaced-missing-citations"],
+      "why_it_didnt_hold": "The thematic notebook's ML-for-Recurrent-Events corpus surfaces a dense DR-survival-CATE lineage the paper does not cite. The paper's absolute statement 'none of the above approaches focuses on estimating the heterogeneous treatment effect or on associated uncertainty quantification' is literally true only of the four benchmarked baselines; it is misleading about the broader field. This is an oversell of novelty (the novel combination is real; the sweep of the novelty claim is too broad)."
+    },
+    {
+      "lens_id": 8, "name": "reproducibility", "severity": "major",
+      "one_line_finding": "The `grf` R/C++ package (v2.1, CRAN + github.com/grf-labs/grf) is the method's canonical public release and is a strong reproducibility asset. However, the paper does NOT release seeded simulation replication scripts, and tuning is unequal: CSF/IPCW use 2000 trees, min.node.size=5 (grf defaults), while RSF baselines use 500 trees, min.node.size=15 (randomForestSRC defaults). This is a 4x tree count advantage and deeper trees for CSF over its comparators — a fairness concern not flagged in the paper.",
+      "evidence": "present",
+      "author_best_defense": "'Both of our methods, IPCW and CSF, are run using publicly available implementations in the R package grf version 2.1, available from CRAN and at github.com/grf-labs/grf' (Section 4). 'The default tuning parameters in grf were chosen based on empirical performance in a series of experiments (performed independently from the research reported in this paper). This strategy reflects standard practice in applications' (Remark 5). HIV data is public per Data Availability; B=10000 trees, h=1000 for ACTG175.",
+      "summary_for_compaction": "Code release is exemplary (grf v2.1 public, code-reviewed). But no seeded simulation scripts and tuning is visibly unequal (CSF 2000 trees min.node=5 vs RSF 500 trees min.node=15). Severity: major on tuning fairness; minor on replication artifact absence. Overall: major.",
+      "moderator_signals": ["progressing", "tuning-disparity"],
+      "why_it_didnt_hold": "Tuning disparity is a recurring critique of forest-based benchmark papers; CSF receiving 4x more trees and deeper growth than the RSF baselines before the comparison begins introduces a confound the paper neither diagnoses nor ablates. Without seeded replication scripts, a reader cannot regenerate Tables 1-5 or Figure 4 exactly."
+    }
+  ],
+  "synthesis": {
+    "recommendation": "BUILD_ON",
+    "severity_tally": {"critical": 0, "major": 6, "minor": 3, "clean": 0, "errored": 0},
+    "top_killer_questions": [
+      "What is the bias of τ̂(x) under MNAR censoring (toxicity-driven dropout)? Paper gives no bound; no E-value, no tipping-point, no sensitivity model.",
+      "Is CSF's 'wins' ranking stable across modern non-forest rivals (BART-for-survival, DeepSurv-HTE, Tian et al. modified-outcome) AND at censoring > 50% AND overlap near {0.05, 0.95}? Paper does not test.",
+      "In ACTG175, the BLP found no significant heterogeneity; is CSF's CATE variation real effect modification or nuisance-estimation noise? Paper concedes caution, does not adjudicate.",
+      "How does CSF compare against Rava-Xu 2023 rate-DR CATE (published same year, uncited), Henderson 2017 AFT-BART, and Andersen pseudo-obs + ML? Paper does not benchmark.",
+      "Does the assumed β > 1/4 rate for Ŝ_C actually hold under dependent censoring in the dissertation's DGPs? Paper assumes, cites Cui et al. 2022, no empirical rate check."
+    ],
+    "dissertation_relevance": {
+      "comparisons_subproject": "NOT directly applicable — CSF does not handle recurrent events. Use as single-terminal-event reduction baseline only; explicitly note scope restriction.",
+      "missing_types_subproject": "Structurally analogous AIPW construction to this sub-project's DR arm. Paper does NOT cite the Andersen pseudo-observation lineage this sub-project uses — position against both lineages.",
+      "methodological_lessons": [
+        "Any head-to-head with CSF must match tuning (trees, min.node.size) with RSF baselines to avoid L8 fairness issue.",
+        "Extending DR construction to recurrent events requires re-deriving the censoring martingale (terminal-event contamination).",
+        "Citing CSF's 1/sqrt(n) result requires checking the cross-product rate condition in your own nuisance setting (paper assumes at Assumption 8)."
+      ]
+    }
+  },
+  "transcript": [],
+  "moderator_assessments": [],
+  "compaction_history": [],
+  "spawn_count": 28,
+  "spawn_budget": 80,
+  "wall_clock_start": "2026-04-24T00:30:00-04:00",
+  "wall_clock_budget_s": 1800,
+  "abort_reason": null,
+  "moderator_own_context_est_chars": 0,
+  "run_status": "completed",
+  "started_at": "2026-04-24T00:28:00-04:00",
+  "completed_at": "2026-04-24T00:55:00-04:00"
+}

@@ -1,0 +1,249 @@
+{
+  "schema_version": "2",
+  "paper": {
+    "title": "Random Forest Calibration under Class Imbalance: A State-of-the-Art Approach Using SMOTE Preprocessing",
+    "authors": ["Synthetic Authors X.", "Synthetic Authors Y.", "Synthetic Authors Z."],
+    "year": 2026,
+    "source": "master_supporting_docs/supporting_papers/test_papers/testpaper_b_rf_calibration.pdf",
+    "slug": "testpaper_b_rf_2026-04-24"
+  },
+  "invocation": {
+    "depth": 1,
+    "type_override": null,
+    "cross_check_override": null,
+    "skip_novelty": true,
+    "human_checkpoint": false
+  },
+  "notebooks": {
+    "disposable": {
+      "id": "0ab87c96-b4c7-47be-89a6-919b2ab52f4a",
+      "name": "stress-test-testpaper_b_rf_2026-04-24",
+      "created_at": "2026-04-24T12:25:00-04:00",
+      "disposition": "deleted",
+      "promoted_to": null
+    },
+    "thematic": {
+      "id": "c3aab8e1-5c4b-43ec-bafc-ae3745a7c493",
+      "name": "Machine Learning Fundamentals"
+    }
+  },
+  "detected_type": "predictive-ML",
+  "classification_source": "reviewer",
+  "headline_claim": "Applying SMOTE to the training data before fitting a random forest yields state-of-the-art calibration on two benchmark datasets, with Brier scores below 0.08 and expected calibration error (ECE) below 0.03.",
+  "novelty_claims": [
+    "Preprocessing pipeline: SMOTE on combined train+validation pool, then default RF, evaluate on held-out test set.",
+    "State-of-the-art calibration (Brier<0.08, ECE<0.03) with default hyperparameters; 'no tuning required'.",
+    "15% AUROC / 22% ECE gains over plain RF on Kaggle Credit Card Fraud and a private clinical dataset.",
+    "Universal-applicability recommendation: SMOTE-before-RF as default preprocessing for any imbalanced task.",
+    "Implicit claim that oversampling the minority class before tree fitting improves probability calibration."
+  ],
+  "novelty_check": {
+    "status": "skipped",
+    "skip_reason": "user_flag: --skip-novelty; synthetic test paper."
+  },
+  "lens_plan": [
+    {"lens_id": 0, "name": "data", "weight": "heavy", "depth": 1},
+    {"lens_id": 1, "name": "estimand", "weight": "light", "depth": 1},
+    {"lens_id": 2, "name": "identification", "weight": "light", "depth": 1},
+    {"lens_id": 3, "name": "methodology", "weight": "medium", "depth": 1},
+    {"lens_id": 4, "name": "overclaims", "weight": "heavy", "depth": 1},
+    {"lens_id": 5, "name": "alternatives", "weight": "medium", "depth": 1},
+    {"lens_id": 6, "name": "generalizability", "weight": "heavy", "depth": 1},
+    {"lens_id": 7, "name": "positioning", "weight": "heavy", "depth": 1},
+    {"lens_id": 8, "name": "reproducibility", "weight": "heavy", "depth": 1}
+  ],
+  "lenses_completed": [
+    {
+      "lens_id": 0,
+      "name": "data",
+      "severity": "critical",
+      "one_line_finding": "SMOTE is applied to combined train+validation pool BEFORE model fitting; synthetic minority samples encode validation-fold feature vectors as interpolation anchors, collapsing hold-out independence — reported AUROC/ECE are inflated.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 0 (data): SMOTE-before-split leakage pattern. Validation fold's k-nearest-neighbor interpolants leak directly into training set as synthetic siblings. Paper does not mention, bound, or disclaim the leakage mechanism. Reported metrics cannot be trusted.",
+      "moderator_signals": ["data-leakage", "smote-before-split", "author-conceded"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: Your SMOTE-before-split pipeline synthesizes minority examples from the combined train+validation pool before model fitting, which means every validation point's k-nearest-neighbor interpolants leak directly into the training set as synthetic siblings — how can you claim the reported AUROC and ECE are not upward-biased when the validation fold the forest 'never saw' is provably encoded into its training distribution via shared SMOTE parents?", "timestamp_iso": "2026-04-24T12:28:00-04:00", "lens_id": 0, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this. No section of the paper discusses whether SMOTE was applied before or after the train-validation split, acknowledges the shared-parent problem, or provides any argument that the validation fold was held out prior to synthesis. The bias mechanism — that synthetic minority examples generated from the full pool encode validation-fold feature vectors as interpolation anchors, collapsing the independence assumption of the hold-out — is not mentioned, bounded, or disclaimed anywhere.", "timestamp_iso": "2026-04-24T12:31:00-04:00", "lens_id": 0, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author explicitly acknowledges the paper neither addresses SMOTE timing nor bounds/disclaims the leakage mechanism, leaving reported AUROC/ECE potentially inflated with no mitigation disclosed.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T12:40:00-04:00", "lens_id": 0, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "SMOTE applied to train+val pool is a textbook leakage pattern; paper neither acknowledges nor mitigates it. Every reported metric is upward-biased."
+    },
+    {
+      "lens_id": 1,
+      "name": "estimand",
+      "severity": "critical",
+      "one_line_finding": "ECE<0.03 targets calibration on SMOTE-balanced manifold (~50/50), not P(Y=1|X) on source population (0.17% prevalence). Calibration is not invariant to prevalence shift.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 1 (estimand): reported ECE computed on SMOTE-resampled distribution, not source population. Under 2-order-of-magnitude base-rate change, a model calibrated on balanced manifold will over-predict risk at deployment. No prevalence-corrected ECE, no post-hoc recalibration on held-out imbalanced sample. The reported quantity answers a different question than the paper claims.",
+      "moderator_signals": ["estimand-mismatch", "distribution-shift", "author-conceded"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: Your headline ECE < 0.03 claim targets an estimand on the SMOTE-balanced training manifold, not P(Y=1|X) on the source population with 0.17% prevalence — why should any reader believe this number survives the implicit covariate-shift correction SMOTE performs, and where in the paper do you report ECE (and its bootstrap CI) computed on a held-out sample drawn from the original imbalanced distribution with no resampling, recalibration, or prior-probability adjustment applied?", "timestamp_iso": "2026-04-24T12:28:00-04:00", "lens_id": 1, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this. The ECE < 0.03 headline figure is computed on the SMOTE-resampled validation fold, not on a held-out sample drawn from the original 0.17% prevalence distribution. There is no reported calibration metric evaluated under the source population marginal — the estimand targeted is P(Y=1|X) on the balanced manifold, which is a different quantity from the calibration error a deployed model would face at true prevalence. The paper does not acknowledge this gap, does not provide a prevalence-corrected ECE, and does not apply post-hoc recalibration.", "timestamp_iso": "2026-04-24T12:31:00-04:00", "lens_id": 1, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author's admission confirms a complete estimand-population mismatch. ECE<0.03 on SMOTE-balanced fold estimates calibration of P(Y=1|X) under the synthetic ~50/50 manifold, not the source distribution P(Y=1)=0.0017. Calibration is not invariant to prevalence shift. Severity normalized from off-schema 'FATAL' to 'critical'.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T12:40:00-04:00", "lens_id": 1, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "ECE reported on SMOTE-balanced fold, not source population; the headline quantity answers a different question than the one the paper claims to answer."
+    },
+    {
+      "lens_id": 2,
+      "name": "identification",
+      "severity": "skipped",
+      "one_line_finding": "Skipped per predictive-ML weight matrix — no causal estimand, so identification as causal-inference lens does not apply at depth 1.",
+      "evidence": "unavailable",
+      "author_best_defense": null,
+      "summary_for_compaction": "Lens 2 (identification): skipped for predictive-ML paper type at depth 1 per weight matrix; not a causal-inference paper.",
+      "moderator_signals": ["weight-matrix-skip"],
+      "transcript_slice": [
+        {"role": "moderator", "round": 1, "content": "Lens 2 skipped: predictive-ML weight matrix sets identification to 'light' at depth 1, and the paper makes no causal claim. No Reviewer/Author spawn. Represented in state for completeness.", "timestamp_iso": "2026-04-24T12:28:00-04:00", "lens_id": 2, "model": "opus", "notebooks_granted": []},
+        {"role": "moderator", "round": 1, "content": "(placeholder turn 2 — no Author spawn occurred for a skipped lens)", "timestamp_iso": "2026-04-24T12:28:01-04:00", "lens_id": 2, "model": "opus", "notebooks_granted": []},
+        {"role": "moderator", "round": 1, "content": "(placeholder turn 3 — no terminal judgment; lens is skipped, not closed via debate)", "timestamp_iso": "2026-04-24T12:28:02-04:00", "lens_id": 2, "model": "opus", "notebooks_granted": []}
+      ],
+      "why_it_didnt_hold": null
+    },
+    {
+      "lens_id": 3,
+      "name": "methodology",
+      "severity": "major",
+      "one_line_finding": "Default RF (500 trees, no max_depth, min_samples_leaf=1) on imbalanced data is a textbook recipe for sigmoid-shaped miscalibration INDEPENDENT of prevalence; no factorial hyperparameter sensitivity, so 'SMOTE fixes imbalance' is confounded with 'SMOTE masks untuned forest overfitting'.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 3 (methodology): no factorial sweep over max_depth × min_samples_leaf × max_features × n_estimators. The confound 'SMOTE-as-calibrator vs SMOTE-as-regularizer-proxy' is live. Major: the confound is real and structural but resolvable via ablation.",
+      "moderator_signals": ["hyperparameter-confound", "untuned-baseline", "author-conceded"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: You run a default scikit-learn RandomForestClassifier (n_estimators=500, max_depth=None, min_samples_leaf=1, max_features='sqrt') on every imbalanced dataset and then attribute the calibration deficit to class imbalance that SMOTE allegedly repairs - but fully grown trees with single-sample leaves are a textbook recipe for the exact sigmoid-shaped miscalibration you report (Niculescu-Mizil & Caruana 2005), entirely independent of prevalence; where is the factorial hyperparameter sensitivity analysis stratified by imbalance ratio, and absent that grid, on what principled grounds can readers distinguish 'SMOTE fixes imbalance' from 'SMOTE masks the overfitting of an untuned forest'?", "timestamp_iso": "2026-04-24T12:28:00-04:00", "lens_id": 3, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this. There is no factorial hyperparameter sensitivity analysis over max_depth x min_samples_leaf x max_features x n_estimators stratified by imbalance ratio. The default RF configuration is used throughout without ablation. The paper therefore cannot distinguish 'SMOTE fixes imbalance-induced miscalibration' from 'SMOTE incidentally regularizes an overfit forest by forcing balanced leaf population sizes'. The confound is live and unresolved.", "timestamp_iso": "2026-04-24T12:31:00-04:00", "lens_id": 3, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author concedes no factorial hyperparameter sensitivity. Default RF is a well-documented overfitting regime that produces sigmoid-shaped miscalibration. Causal attribution of calibration improvement to SMOTE is unidentified. Severity normalized from off-schema 'UPHELD/MAJOR' to 'major'.\nNEXT: FINAL\nSEVERITY: major", "timestamp_iso": "2026-04-24T12:40:00-04:00", "lens_id": 3, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "No hyperparameter ablation; the 'SMOTE-fixes-calibration' causal claim is confounded with 'SMOTE-masks-untuned-forest-overfitting'."
+    },
+    {
+      "lens_id": 4,
+      "name": "overclaims",
+      "severity": "major",
+      "one_line_finding": "'State-of-the-art' claim with only plain-RF as baseline — no Platt, no isotonic, no class-weighted RF, no focal loss, no calibration wrappers. No confidence intervals, no bootstrap, no DeLong. 0.94 vs 0.92 AUROC within random variation.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 4 (overclaims): 'state-of-the-art' asserted without statistical support. Single baseline, no CIs, no significance test. 2-point AUROC margin not distinguishable from noise at the reported sample sizes. Major: the framing is overstated but the method isn't worthless; would be fixable with CIs + competitive baselines.",
+      "moderator_signals": ["missing-baselines", "missing-uncertainty", "author-conceded"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: You brand your SMOTE-RF pipeline 'state-of-the-art' while benchmarking only against a single plain-RF baseline - with no Platt scaling, no isotonic regression, no class-weighted RF, no focal-loss variant, and no post-hoc calibration wrapper - and you report 0.94 vs 0.92 AUROC without a single confidence interval, bootstrap band, or DeLong test: on what statistical grounds can you distinguish your method from chance-level noise over plain RF, let alone from the established calibration baselines you silently omitted?", "timestamp_iso": "2026-04-24T12:28:00-04:00", "lens_id": 4, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this. The 'state-of-the-art' label is undefended on every dimension the question raises. No confidence intervals are reported around the 0.94 vs. 0.92 AUROC figures, no bootstrap bands are constructed, and no formal hypothesis test (DeLong, permutation, or otherwise) is applied to establish that the two-point difference is statistically distinguishable from sampling noise. The benchmark set is limited to a single plain-RF baseline; Platt scaling, isotonic regression, class-weighted RF, focal loss, and post-hoc calibration wrappers are all absent.", "timestamp_iso": "2026-04-24T12:31:00-04:00", "lens_id": 4, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author concedes the paper lacks CIs, bootstrap, DeLong, or any statistical test. A 0.02 AUROC margin against a single un-tuned plain-RF baseline cannot support a 'state-of-the-art' designation. Severity normalized from off-schema 'FAIL/CRITICAL' to 'major'.\nNEXT: FINAL\nSEVERITY: major", "timestamp_iso": "2026-04-24T12:40:00-04:00", "lens_id": 4, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "'State-of-the-art' label asserted without uncertainty quantification or competitive baselines; 2-point AUROC margin indistinguishable from sampling noise."
+    },
+    {
+      "lens_id": 5,
+      "name": "alternatives",
+      "severity": "major",
+      "one_line_finding": "Observed gains confound (a) training-size increase from oversampling, (b) merged train+val pool, (c) actual probability recalibration. No post-hoc Platt/isotonic control on plain RF to isolate (c).",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 5 (alternatives): three competing mechanisms unidentified. Standard calibration baseline (Platt/isotonic on plain RF) would isolate the actual recalibration signal; its absence is a material omission for a paper whose headline claim is calibration improvement. Major, not critical.",
+      "moderator_signals": ["missing-control", "confounded-mechanism", "author-conceded"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: Your paper attributes the AUROC/ECE gains to SMOTE-before-RF improving probability calibration, but this confounds three distinct mechanisms - can you rule out that the improvement is driven by (a) increased effective training-set size from synthetic minority oversampling rather than calibration per se, (b) the merged train+validation pool giving SMOTE-RF more data than any fair baseline, or (c) genuine probability recalibration - and specifically, why did you not include the obvious control of post-hoc Platt scaling or isotonic regression applied to plain (non-SMOTE) RF on the original imbalanced data?", "timestamp_iso": "2026-04-24T12:28:00-04:00", "lens_id": 5, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this. No post-hoc Platt scaling or isotonic regression control is included or discussed. The three mechanisms are not disentangled. A post-hoc calibration baseline applied to an uncorrupted plain RF, evaluated on a held-out set that has never been oversampled, would isolate whether calibration improvement exceeds what simple output rescaling achieves. The absence of this control means the paper cannot attribute observed gains specifically to SMOTE's minority-class boundary shaping rather than to prior-correction any post-hoc method would provide.", "timestamp_iso": "2026-04-24T12:31:00-04:00", "lens_id": 5, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author concedes no post-hoc calibration control. Without isolating arm, calibration gains cannot be attributed to SMOTE's minority-class boundary shaping vs generic prior-correction, larger training size, or merged pool. Identification gap, not presentation. Severity normalized from off-schema 'CONFIRMED WEAKNESS/MAJOR' to 'major'.\nNEXT: FINAL\nSEVERITY: major", "timestamp_iso": "2026-04-24T12:40:00-04:00", "lens_id": 5, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "No post-hoc calibration control to isolate genuine recalibration from training-size and pool-size alternatives."
+    },
+    {
+      "lens_id": 6,
+      "name": "generalizability",
+      "severity": "major",
+      "one_line_finding": "2 tabular datasets (imbalance ratio ∈ [0.17%, 3.2%]), 1 classifier (default RF), 1 resampler (vanilla SMOTE), iid splits — yet Conclusion recommends 'default preprocessing step in any imbalanced classification task'.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 6 (generalizability): 5 unsupported extrapolation axes — imbalance severity beyond tested range, non-tabular modalities, GBM/NN classifiers, domain shift/temporal splits, cost-sensitive deployment. Universal recommendation not supported by 2-dataset evidence base.",
+      "moderator_signals": ["over-generalization", "universal-claim", "author-conceded"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: Your study spans exactly two tabular datasets with imbalance ratios confined to [0.17%, 3.2%], a single classifier family (default-hyperparameter Random Forest), and a single resampling variant (vanilla SMOTE) evaluated under i.i.d. random splits - yet Section 5 recommends the SMOTE-RF pipeline 'as a default preprocessing step in any imbalanced classification task.' On what inferential basis do you extrapolate to (a) moderate imbalance regimes (5-20%) and extreme regimes (<0.1%) that you never sampled, (b) non-tabular modalities, (c) gradient-boosted trees and neural networks, (d) domain shift and temporal splits, and (e) cost-sensitive deployment settings you never evaluated?", "timestamp_iso": "2026-04-24T12:28:00-04:00", "lens_id": 6, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address extrapolation to (a) moderate or extreme imbalance regimes, (b) non-tabular modalities, (c) gradient boosting or neural networks, (d) domain shift or temporal splits, or (e) cost-sensitive deployment. The recommendation to use the pipeline 'as a default preprocessing step in any imbalanced classification task' is not supported by the empirical scope. Two datasets, single classifier, single resampler, iid split design cannot sustain a universal recommendation.", "timestamp_iso": "2026-04-24T12:31:00-04:00", "lens_id": 6, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author concedes recommendation generalizes beyond the evidentiary base. Five unsupported extrapolation axes are exactly the axes over which resampling behavior is known to vary. Severity normalized from off-schema 'CONFIRMED_WEAKNESS/MAJOR' to 'major'.\nNEXT: FINAL\nSEVERITY: major", "timestamp_iso": "2026-04-24T12:40:00-04:00", "lens_id": 6, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "Universal recommendation not supported; 5 extrapolation axes unsampled are exactly where resampling behavior is known to vary."
+    },
+    {
+      "lens_id": 7,
+      "name": "positioning",
+      "severity": "critical",
+      "one_line_finding": "Paper claims 'state-of-the-art calibration' yet cites ZERO calibration literature — Niculescu-Mizil & Caruana (2005, canonical RF calibration), Guo et al. (2017, temperature scaling), Dal Pozzolo et al. (2015), and Wallace-Dahabreh (2014) all uncited. Dal Pozzolo and Wallace-Dahabreh analytically PROVE resampling decalibrates — the opposite of this paper's thesis.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this. References list contains only Chawla (2002) and Breiman (2001).",
+      "summary_for_compaction": "Lens 7 (positioning): total omission of the calibration literature. Paper's core thesis (SMOTE-before-RF improves calibration) directly contradicts established analytical results (Dal Pozzolo 2015, Wallace-Dahabreh 2014) proving the opposite. The canonical RF calibration reference (Niculescu-Mizil 2005) is not cited. Critical — the paper's central claim is a known anti-pattern.",
+      "moderator_signals": ["prior-art-total-omission", "contradicts-established-theory", "author-conceded"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "THEMATIC_QUERY results: Niculescu-Mizil 2005 = canonical RF calibration benchmark (uncited); Guo 2017 temperature scaling (uncited); Dal Pozzolo 2015 + Wallace-Dahabreh 2014 analytically prove resampling decalibrates (uncited, opposite thesis); mainstream ML does NOT recommend SMOTE-before-RF for calibration. QUESTION: Your paper claims 'state-of-the-art calibration' for SMOTE-before-RF yet cites zero calibration literature - neither Niculescu-Mizil & Caruana (2005), the canonical RF calibration benchmark, nor Guo et al. (2017). Dal Pozzolo et al. (2015) and Wallace & Dahabreh (2014) prove analytically that training on class-rebalanced data shifts the posterior away from the true base rate and therefore decalibrates probabilities - the exact opposite of your thesis. On what basis can this manuscript claim a calibration contribution rather than a replication of a known anti-pattern?", "timestamp_iso": "2026-04-24T12:28:00-04:00", "lens_id": 7, "model": "opus", "notebooks_granted": ["disposable", "thematic"]},
+        {"role": "author", "round": 1, "content": "ANSWER: The paper does not address this. The manuscript does not cite Niculescu-Mizil & Caruana (2005), Guo et al. (2017), Dal Pozzolo et al. (2015), or Wallace & Dahabreh (2014). No calibration literature appears in the reference list. The claim of 'state-of-the-art calibration' is asserted without grounding in the established calibration benchmarking tradition, and the paper does not engage with the analytical result that rebalancing training data decalibrates predicted probabilities absent a Bayes correction. There is no defense available from the text.", "timestamp_iso": "2026-04-24T12:31:00-04:00", "lens_id": 7, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Paper's thesis directly contradicts established analytical results (Dal Pozzolo 2015, Wallace-Dahabreh 2014) showing resampling decalibrates posteriors. The canonical RF calibration reference (Niculescu-Mizil 2005) is uncited. Author concedes the omission is total. This is a known anti-pattern, not a novel contribution. Severity normalized from off-schema 'BLOCKING' to 'critical'.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T12:40:00-04:00", "lens_id": 7, "model": "opus", "notebooks_granted": ["disposable", "thematic"]}
+      ],
+      "why_it_didnt_hold": "Core claim (SMOTE-before-RF improves calibration) directly contradicts established results proving resampling decalibrates; zero calibration literature cited."
+    },
+    {
+      "lens_id": 8,
+      "name": "reproducibility",
+      "severity": "critical",
+      "one_line_finding": "Private dataset (no DUA/availability), no seed, no code repo, no SMOTE k_neighbors, no random_state, no fold-leakage confirmation. Zero numerical results reproducible.",
+      "evidence": "absent",
+      "author_best_defense": "the paper does not address this",
+      "summary_for_compaction": "Lens 8 (reproducibility): zero numerical results could be reproduced by an independent statistician. Data, code, and stochastic specification all absent. Total reproducibility failure.",
+      "moderator_signals": ["no-seed", "no-code", "no-data-access", "author-conceded"],
+      "transcript_slice": [
+        {"role": "reviewer", "round": 1, "content": "QUESTION: Your reproducibility section is effectively vacuous: one of the two datasets has neither a DUA, an availability statement, nor a synthetic surrogate; you report no random seed for resampling, model fitting, or the train/validation/test partition; there is no code repository; the SMOTE configuration omits k_neighbors, the random_state, and whether oversampling was performed inside each CV fold or once on the full training set - so concretely, which single numerical result could an independent biostatistician reproduce?", "timestamp_iso": "2026-04-24T12:28:00-04:00", "lens_id": 8, "model": "opus", "notebooks_granted": ["disposable"]},
+        {"role": "author", "round": 1, "content": "ANSWER: the paper does not address this. No single numerical result in the paper could be reproduced by an independent statistician. The reproducibility section omits all of: a data use agreement or availability statement for the second dataset, any random seed, a code repository, SMOTE hyperparameters (k_neighbors, random_state), confirmation that SMOTE was applied inside CV folds, and stratification confirmation.", "timestamp_iso": "2026-04-24T12:31:00-04:00", "lens_id": 8, "model": "sonnet", "notebooks_granted": ["disposable"]},
+        {"role": "reviewer", "round": 1, "content": "JUDGMENT: conceded\nREASONING: Author concedes completely. Zero numerical results reproducible: no DUA, no seed, no code, no SMOTE spec, no fold-leakage audit. Total reproducibility failure. Severity normalized from off-schema 'AUTHOR_CONCEDES/CRITICAL' to 'critical'.\nNEXT: FINAL\nSEVERITY: critical", "timestamp_iso": "2026-04-24T12:40:00-04:00", "lens_id": 8, "model": "opus", "notebooks_granted": ["disposable"]}
+      ],
+      "why_it_didnt_hold": "Every reproducibility artifact (data, seed, code, hyperparameters) is absent. No single result reproducible."
+    }
+  ],
+  "synthesis": {
+    "verdict": "The paper proposes SMOTE-before-RF as a 'state-of-the-art' calibration technique for imbalanced classification. The thematic-notebook check surfaces a decisive positioning failure: the core thesis directly contradicts established analytical results (Dal Pozzolo 2015, Wallace-Dahabreh 2014) proving that resampling decalibrates posteriors, and the canonical RF calibration reference (Niculescu-Mizil & Caruana 2005) is uncited. Compounding this, SMOTE is applied to the combined train+validation pool before model fitting — a textbook data-leakage pattern that inflates every reported metric. Reported ECE is computed on the SMOTE-balanced manifold rather than the source-population distribution (0.17% prevalence). No hyperparameter sensitivity, no competitive baselines, no post-hoc calibration control, no confidence intervals, no seed, no code. Recommendation: skip — the paper's headline contribution is a known anti-pattern with no reproducible evidence base.",
+    "top_killer_questions": [
+      {"question": "The core claim (SMOTE-before-RF improves calibration) directly contradicts Dal Pozzolo et al. (2015) and Wallace-Dahabreh (2014), both uncited, who analytically prove resampling decalibrates probabilities; how is this a contribution rather than a known anti-pattern?", "lens_id": 7, "lens_name": "positioning", "severity": "critical", "why_it_matters": "The headline claim contradicts established theory; citing this paper as a calibration method would mislead downstream users."},
+      {"question": "SMOTE is applied to combined train+validation data before model fitting — every validation point's synthetic neighbors leak into training. On what basis are the reported AUROC/ECE not upward-biased?", "lens_id": 0, "lens_name": "data", "severity": "critical", "why_it_matters": "Reported metrics are not meaningful if the validation fold was encoded into training via SMOTE interpolation."},
+      {"question": "ECE<0.03 targets the SMOTE-balanced distribution (~50/50), not the source population P(Y=1)=0.0017; calibration is not invariant to prevalence shift. Where is the prevalence-corrected ECE?", "lens_id": 1, "lens_name": "estimand", "severity": "critical", "why_it_matters": "Downstream clinical or financial deployment at true prevalence cannot rely on the reported calibration."},
+      {"question": "Which single numerical result could an independent statistician reproduce — no DUA, no seed, no code, no SMOTE hyperparameters, no fold-leakage audit?", "lens_id": 8, "lens_name": "reproducibility", "severity": "critical", "why_it_matters": "Zero reproducibility; the paper is unauditable."},
+      {"question": "Default RF (500 trees, no max_depth, leaf=1) on imbalanced data is a textbook miscalibration regime independent of prevalence. Where is the factorial hyperparameter ablation to distinguish 'SMOTE fixes imbalance' from 'SMOTE masks untuned-forest overfitting'?", "lens_id": 3, "lens_name": "methodology", "severity": "major", "why_it_matters": "Causal attribution of the calibration signal to SMOTE vs hyperparameter-regularization-by-proxy is unidentified."}
+    ],
+    "subproject_relevance": {
+      "Missing Types": {
+        "applies": "No - synthetic test paper; not a useful reference or comparator for recurrent-event pseudo-observation work.",
+        "data_match": "Poor. Missing Types targets missing event-type labels for recurrent competing-risks events; this paper is binary classification under class imbalance.",
+        "warning": "If probability calibration ever becomes relevant in Missing Types evaluation (e.g., calibrating predicted cumulative incidences), cite Niculescu-Mizil & Caruana (2005), Guo et al. (2017), and Dal Pozzolo et al. (2015) for the RF calibration / resampling-decalibrates tradition.",
+        "missing_comparator": "Not a candidate baseline."
+      },
+      "Comparisons": {
+        "applies": "No.",
+        "data_match": "Poor. Comparisons targets recurrent competing risks; this paper is binary classification.",
+        "warning": "Same as above.",
+        "missing_comparator": "Not a candidate baseline."
+      }
+    },
+    "recommendation": "skip",
+    "recommendation_rationale": "Severity tally across the 8 active lenses (lens 2 skipped per predictive-ML weight matrix): critical=4 (lenses 0/1/7/8), major=4 (lenses 3/4/5/6), minor=0, clean=0, skipped=1 (lens 2). Mechanical rule: critical >= 1 -> skip. The paper fails on every dimension a calibration paper must pass: leaked data, wrong-distribution estimand, known anti-pattern thesis, zero reproducibility. Skip.",
+    "severity_tally": {"critical": 4, "major": 4, "minor": 0, "clean": 0, "skipped": 1}
+  },
+  "moderator_assessments": [
+    {"lens_id": 0, "round": 1, "content": "R1 Author conceded SMOTE-before-split leakage pattern. Severity critical accepted - leakage invalidates all reported metrics.", "timestamp_iso": "2026-04-24T12:41:00-04:00"},
+    {"lens_id": 1, "round": 1, "content": "R1 Author conceded estimand-population mismatch. Reviewer produced off-schema 'FATAL' label; Moderator normalized to severity=critical, judgment=conceded.", "timestamp_iso": "2026-04-24T12:41:00-04:00"},
+    {"lens_id": 2, "round": 1, "content": "Lens 2 skipped per predictive-ML weight matrix (identification not central to non-causal predictive work at depth 1). No debate.", "timestamp_iso": "2026-04-24T12:28:00-04:00"},
+    {"lens_id": 3, "round": 1, "content": "R1 Author conceded no hyperparameter sensitivity. Reviewer produced off-schema 'UPHELD/MAJOR' label; Moderator normalized to severity=major, judgment=conceded.", "timestamp_iso": "2026-04-24T12:41:00-04:00"},
+    {"lens_id": 4, "round": 1, "content": "R1 Author conceded no CIs, no competitive baselines. Reviewer produced off-schema 'FAIL/CRITICAL' label; Moderator normalized to severity=major (not critical — the framing is overstated but fixable), judgment=conceded.", "timestamp_iso": "2026-04-24T12:41:00-04:00"},
+    {"lens_id": 5, "round": 1, "content": "R1 Author conceded no post-hoc calibration control. Reviewer produced off-schema 'CONFIRMED_WEAKNESS/MAJOR' label; Moderator normalized to severity=major, judgment=conceded.", "timestamp_iso": "2026-04-24T12:41:00-04:00"},
+    {"lens_id": 6, "round": 1, "content": "R1 Author conceded over-generalization. Reviewer produced off-schema 'CONFIRMED_WEAKNESS/MAJOR' label; Moderator normalized to severity=major, judgment=conceded.", "timestamp_iso": "2026-04-24T12:41:00-04:00"},
+    {"lens_id": 7, "round": 1, "content": "R1 Author conceded total omission of calibration literature. Paper's thesis contradicts Dal Pozzolo/Wallace-Dahabreh analytical results. Reviewer produced off-schema 'BLOCKING' label; Moderator normalized to severity=critical, judgment=conceded.", "timestamp_iso": "2026-04-24T12:41:00-04:00"},
+    {"lens_id": 8, "round": 1, "content": "R1 Author conceded zero reproducibility. Reviewer produced off-schema 'AUTHOR_CONCEDES/CRITICAL' label; Moderator normalized to severity=critical, judgment=conceded.", "timestamp_iso": "2026-04-24T12:41:00-04:00"}
+  ],
+  "compaction_history": [],
+  "spawn_count": 25,
+  "spawn_budget": 80,
+  "wall_clock_start": "2026-04-24T12:26:00-04:00",
+  "wall_clock_budget_s": 1800,
+  "abort_reason": null,
+  "moderator_own_context_est_chars": 85000,
+  "run_status": "completed",
+  "started_at": "2026-04-24T12:25:00-04:00",
+  "completed_at": "2026-04-24T12:48:00-04:00"
+}

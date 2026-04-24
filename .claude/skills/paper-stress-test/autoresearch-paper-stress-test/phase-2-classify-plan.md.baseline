@@ -104,14 +104,7 @@ Must match `["predictive-ML", "new-estimator", "applied-empirical", "causal-infe
 
 ## Step 2.5 — Fire novelty-check as a background Agent
 
-If `invocation.skip_novelty == true`: set `novelty_check.status = "skipped"`, populate `skip_reason` with one of the canonical reasons below (whichever fits), and skip 2.5–2.8. Lens 7 still runs; its thematic-notebook triangulation becomes the sole prior-art check.
-
-**Canonical skip reasons** (pick one — do NOT invent new wording):
-
-- `"user_flag"` — the `--skip-novelty` argument was passed; no content judgment implied.
-- `"old_paper"` — paper `year <= current_year - 5`. Phrase as: `"Paper is N years old; novelty-check is calibrated for unpublished/recent work. Lens 7 thematic triangulation replaces it and may surface both prior and descendant work."` Do NOT claim the novelty-check "would surface only descendants" — that is empirically false for older papers whose prior art predates them.
-- `"already_cited"` — paper is already in the user's thematic notebook and has an established citation history in this project.
-- `"replication_run"` — resumed or re-run of a prior stress-test whose novelty-check is still valid; copy the prior run's novelty_check block verbatim.
+If `invocation.skip_novelty == true`: set `novelty_check.status = "skipped"` and skip 2.5–2.8.
 
 Otherwise, dispatch:
 
