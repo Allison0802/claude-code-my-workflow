@@ -2,36 +2,64 @@
 """
 Post-hoc validator for paper-stress-test state.json files.
 
-Checks GATE invariants G-3a, G-3b, G-3c, G-4a, G-5a documented in SKILL.md.
+Checks GATE invariants documented in SKILL.md:
+  - G-3a           : per-lens hollow-run invariants (transcript_slice length, non-empty fields).
+  - G-3b           : per-lens required keys + severity enum.
+  - G-3c           : phase 3 integrity (spawn counts, transcript length vs slice_total).
+  - G-3-schema     : NEW (2026-04-23 refactor) — every turn_record matches canonical shape
+                     (keys role/round/content/timestamp_iso/lens_id; no turn/action/close_lens_mode/
+                     novelty_seed/notebook_id/query/result_summary at the record level).
+  - G-3-model      : NEW — every Author turn's "model" matches ^(opus|sonnet|haiku)(-[a-z0-9-]+)?$.
+                     Rejects moderator_notebook_proxy.
+  - G-3-notebook   : NEW (invariant I-5) — role-notebook isolation. Author's notebooks_granted
+                     MUST NOT include thematic notebook id. Moderator's MUST be [].
+  - G-3-mod-content: NEW — moderator_assessments entries have non-empty content and non-null round.
+  - G-4a           : synthesis schema + recommendation enum.
+  - G-5a           : disposition resolved at completion (I-4).
+
 Exits 0 if well-formed, 1 otherwise. Prints one line per violation to stdout.
 
 Usage:
     python3 validate_state.py <path-to-state.json>
-    python3 validate_state.py --partial-group <path-to-group-N.json>
-    python3 validate_state.py --check-merge <state.json> <group_0.json> <group_1.json> <group_2.json>
 
 Modes:
-  default: validate a fully-merged state.json against all 5 gates.
-  --partial-group: validate a single group partial against G-3a-local and G-3b-local.
-  --check-merge: validate that the merged state.json is consistent with the 3 partials
-                 (no duplicate lens_ids, all 9 covered when all groups completed, counts match).
+  default: validate a fully-merged state.json against all gates.
 
-The skill does NOT invoke this at runtime (runtime gates enforce equivalents);
-this exists for (a) post-hoc triage of legacy runs, (b) regression-testing
-proposed SKILL.md edits against known failed runs (e.g. Lin 2021, Loe 2025),
-(c) validating group partials in the 3×3 parallel architecture.
+Note (2026-04-24 flat-dispatch refactor): --partial-group and --check-merge
+modes were removed. The skill no longer produces partial state files because
+nested subagent dispatch is architecturally impossible in Claude Code. All
+lenses run inside the top-level Moderator; there is one state.json, nothing
+to merge.
+
 Stdlib only; no external dependencies.
 """
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
 
 
 RECOMMENDATION_ENUM = {"cite", "build-on", "flag", "skip"}
-SEVERITY_ENUM = {"critical", "major", "minor", "clean", "errored"}
+SEVERITY_ENUM = {"critical", "major", "minor", "clean", "errored", "skipped"}
+ROLE_ENUM = {"reviewer", "author", "moderator"}
+MODEL_RE = re.compile(r"^(opus|sonnet|haiku)(-[a-z0-9-]+)?$")
+# Canonical turn_record keys (schema/state.schema.json#/definitions/turn_record).
+CANONICAL_TURN_KEYS = {"role", "round", "content", "timestamp_iso", "lens_id"}
+OPTIONAL_TURN_KEYS = {"model", "notebooks_granted"}
+ALLOWED_TURN_KEYS = CANONICAL_TURN_KEYS | OPTIONAL_TURN_KEYS
+# Forbidden keys that appeared in v1 Group-2 drift.
+FORBIDDEN_TURN_KEYS = {
+    "turn", "action", "close_lens_mode", "novelty_seed",
+    "notebook_id", "query", "result_summary", "result_verbatim",
+    "phase", "confrontation_mode",
+}
+FORBIDDEN_ROLES = {
+    "moderator_notebook_query", "moderator_thematic_query",
+    "moderator_notebook_proxy", "moderator_direct", "moderator_notebook_proxy_author",
+}
 REQUIRED_LENS_KEYS = (
     "lens_id",
     "name",
@@ -129,21 +157,14 @@ def check_g3c(state: dict) -> list[str]:
             )
     depth_sum = sum((l.get("depth") or 0) for l in active)
     if state.get("run_status") == "completed" and depth_sum > 0:
-        # Parallel 3x3 formula: 3 group-agent dispatches + 2 per depth unit (Reviewer + Author per lens/round).
-        # Legacy sequential runs used floor = 2 * depth_sum; parallel floor = 3 + 2 * depth_sum.
-        floor_parallel = 3 + 2 * depth_sum
-        floor_legacy = 2 * depth_sum
+        # Flat-dispatch formula (2026-04-24): 2 spawns per depth unit (Reviewer + Author per lens/round)
+        # plus 1 for the Phase-2a classification call. Group-agent dispatches do not exist anymore.
+        floor_flat = 2 * depth_sum + 1
         sc = state.get("spawn_count", 0)
-        if sc < floor_legacy:
+        if sc < floor_flat:
             fails.append(
-                f"GATE G-3c FAIL: spawn_count={sc} < legacy floor 2*sum(depth)={floor_legacy} "
-                f"(Reviewer+Author per depth unit is the minimum; a hollow run has 0)"
-            )
-        elif sc < floor_parallel and state.get("architecture", "parallel") == "parallel":
-            fails.append(
-                f"GATE G-3c FAIL: spawn_count={sc} < parallel floor 3 + 2*sum(depth)={floor_parallel} "
-                f"(3 group-agent dispatches + Reviewer+Author per depth unit). "
-                f"If this is a legacy sequential run, set state.architecture='sequential' to skip this check."
+                f"GATE G-3c FAIL: spawn_count={sc} < flat-dispatch floor 2*sum(depth)+1={floor_flat} "
+                f"(Reviewer+Author per depth unit + 1 Phase-2a classification; a hollow run has 0)"
             )
     if len(state.get("moderator_assessments") or []) < len(lenses):
         fails.append(
@@ -162,6 +183,162 @@ def check_g3c(state: dict) -> list[str]:
             f"GATE G-3c FAIL: transcript length={transcript_len} < "
             f"sum(transcript_slice lengths)={slice_total}"
         )
+    return fails
+
+
+def _iter_all_turn_records(state: dict):
+    """Yield (location, turn_record) pairs for every turn across state.transcript and
+    every lens.transcript_slice. Deduplication is not attempted — a turn in both places
+    is emitted twice so the offending location is always named."""
+    for i, t in enumerate(state.get("transcript") or []):
+        yield (f"state.transcript[{i}]", t)
+    for i, lens in enumerate(state.get("lenses_completed") or []):
+        lens_id = lens.get("lens_id", f"<index {i}>")
+        for j, t in enumerate(lens.get("transcript_slice") or []):
+            yield (f"lens {lens_id} transcript_slice[{j}]", t)
+
+
+def check_g3_schema(state: dict) -> list[str]:
+    """NEW 2026-04-23. Every turn_record matches canonical shape — no legacy keys."""
+    fails: list[str] = []
+    for loc, t in _iter_all_turn_records(state):
+        if not isinstance(t, dict):
+            fails.append(f"GATE G-3-schema FAIL: {loc} is {type(t).__name__}, expected object")
+            continue
+        keys = set(t.keys())
+        # Forbidden keys present?
+        bad = keys & FORBIDDEN_TURN_KEYS
+        if bad:
+            fails.append(
+                f"GATE G-3-schema FAIL: {loc} has forbidden keys {sorted(bad)} "
+                f"(v1 Group-2 drift pattern)"
+            )
+        # Required keys present?
+        missing = CANONICAL_TURN_KEYS - keys
+        if missing:
+            fails.append(
+                f"GATE G-3-schema FAIL: {loc} missing required keys {sorted(missing)}"
+            )
+        # Extra keys beyond canonical + optional?
+        extra = keys - ALLOWED_TURN_KEYS
+        if extra:
+            fails.append(
+                f"GATE G-3-schema FAIL: {loc} has unexpected keys {sorted(extra)} "
+                f"(not in canonical shape)"
+            )
+        # Role in enum, NOT in forbidden list.
+        role = t.get("role")
+        if role in FORBIDDEN_ROLES:
+            fails.append(
+                f"GATE G-3-schema FAIL: {loc} role={role!r} is a legacy drift role "
+                f"(must be one of {sorted(ROLE_ENUM)})"
+            )
+        elif role not in ROLE_ENUM:
+            fails.append(
+                f"GATE G-3-schema FAIL: {loc} role={role!r} not in {sorted(ROLE_ENUM)}"
+            )
+        # content non-empty string.
+        if not _nonempty_str(t.get("content")):
+            fails.append(f"GATE G-3-schema FAIL: {loc} content is empty/missing")
+        # round integer >= 1.
+        r = t.get("round")
+        if not isinstance(r, int) or r < 1:
+            fails.append(f"GATE G-3-schema FAIL: {loc} round={r!r} must be int >= 1")
+        # lens_id integer in 0..8.
+        lid = t.get("lens_id")
+        if not isinstance(lid, int) or not (0 <= lid <= 8):
+            fails.append(f"GATE G-3-schema FAIL: {loc} lens_id={lid!r} must be int in 0..8")
+    return fails
+
+
+def check_g3_model(state: dict) -> list[str]:
+    """NEW. Every turn's model (if present) matches opus|sonnet|haiku pattern.
+    Rejects moderator_notebook_proxy and similar v1 drift values."""
+    fails: list[str] = []
+    for loc, t in _iter_all_turn_records(state):
+        if not isinstance(t, dict):
+            continue
+        model = t.get("model")
+        if model is None:
+            continue  # optional field; if absent we don't check it here
+        if not isinstance(model, str) or not MODEL_RE.match(model):
+            fails.append(
+                f"GATE G-3-model FAIL: {loc} model={model!r} does not match "
+                f"^(opus|sonnet|haiku)(-[a-z0-9-]+)?$"
+            )
+    return fails
+
+
+def check_g3_notebook(state: dict) -> list[str]:
+    """NEW (invariant I-5). Role-notebook isolation:
+       - Reviewer: MAY include thematic id (required for Lens 7).
+       - Author:   MUST NOT include thematic id (ever).
+       - Moderator: MUST be [].
+    """
+    fails: list[str] = []
+    notebooks = state.get("notebooks") or {}
+    thematic = (notebooks.get("thematic") or {}).get("id")
+    if thematic is None:
+        # User opted out of cross-check in Phase 1; I-5 vacuously holds.
+        return fails
+    for loc, t in _iter_all_turn_records(state):
+        if not isinstance(t, dict):
+            continue
+        role = t.get("role")
+        granted = t.get("notebooks_granted")
+        if granted is None:
+            continue  # optional field; absence is not a violation on its own
+        if not isinstance(granted, list):
+            fails.append(
+                f"GATE G-3-notebook FAIL: {loc} notebooks_granted is "
+                f"{type(granted).__name__}, expected list"
+            )
+            continue
+        if role == "author" and thematic in granted:
+            fails.append(
+                f"GATE G-3-notebook FAIL: {loc} role=author but notebooks_granted "
+                f"includes thematic id {thematic!r} (I-5 violation)"
+            )
+        if role == "moderator" and granted:
+            fails.append(
+                f"GATE G-3-notebook FAIL: {loc} role=moderator but notebooks_granted "
+                f"is non-empty {granted!r} (I-5: moderator holds no notebook)"
+            )
+    return fails
+
+
+def check_g3_mod_content(state: dict) -> list[str]:
+    """NEW. moderator_assessments entries must have non-empty content, non-null round,
+    valid lens_id, non-empty timestamp_iso."""
+    fails: list[str] = []
+    for i, entry in enumerate(state.get("moderator_assessments") or []):
+        if not isinstance(entry, dict):
+            fails.append(
+                f"GATE G-3-mod-content FAIL: moderator_assessments[{i}] is "
+                f"{type(entry).__name__}, expected object"
+            )
+            continue
+        loc = f"moderator_assessments[{i}]"
+        lid = entry.get("lens_id")
+        if not isinstance(lid, int) or not (0 <= lid <= 8):
+            fails.append(
+                f"GATE G-3-mod-content FAIL: {loc} lens_id={lid!r} must be int in 0..8"
+            )
+        r = entry.get("round")
+        if not isinstance(r, int) or r < 1:
+            fails.append(
+                f"GATE G-3-mod-content FAIL: {loc} round={r!r} must be int >= 1 "
+                f"(empty stubs with round=null are rejected)"
+            )
+        if not _nonempty_str(entry.get("content")):
+            fails.append(
+                f"GATE G-3-mod-content FAIL: {loc} content is empty/missing "
+                f"(empty stubs are rejected)"
+            )
+        if not _nonempty_str(entry.get("timestamp_iso")):
+            fails.append(
+                f"GATE G-3-mod-content FAIL: {loc} timestamp_iso is empty/missing"
+            )
     return fails
 
 
@@ -217,103 +394,16 @@ def check_g5a(state: dict) -> list[str]:
             f"GATE G-5a FAIL: notebooks.disposable.disposition={disp!r} not in {sorted(valid)} "
             f"on a completed run (Phase 6 cleanup did not run)"
         )
-    top_disp = state.get("disposition")
-    if top_disp in {None, "pending"} and state.get("run_status") == "completed":
-        fails.append(
-            f"GATE G-5a FAIL: top-level state.disposition={top_disp!r} on a completed run "
-            f"(Phase 6 cleanup did not run)"
-        )
+    # Note: v1 had a legacy top-level state.disposition field. Schema v2 removed it.
+    # Only notebooks.disposable.disposition is authoritative.
     return fails
 
 
-def check_partial_group(partial: dict) -> list[str]:
-    """Validate a single group partial (G-3a-local + G-3b-local equivalent)."""
-    fails: list[str] = []
-    gid = partial.get("group_id")
-    if gid not in {0, 1, 2}:
-        fails.append(f"PARTIAL FAIL: group_id={gid!r} not in {{0, 1, 2}}")
-    assigned = partial.get("lens_ids_assigned") or []
-    if not isinstance(assigned, list):
-        fails.append(f"PARTIAL FAIL: lens_ids_assigned is {type(assigned).__name__}, expected list")
-        assigned = []
-    records = partial.get("lens_records") or []
-    if not isinstance(records, list):
-        fails.append(f"PARTIAL FAIL: lens_records is {type(records).__name__}, expected list")
-        return fails
-    aborted = bool(partial.get("aborted", False))
-    if not aborted and len(records) != len(assigned):
-        fails.append(
-            f"PARTIAL FAIL: group {gid} aborted=false but len(lens_records)={len(records)} "
-            f"!= len(lens_ids_assigned)={len(assigned)}"
-        )
-    # Per-record G-3b-local: reuse check_g3b by wrapping the records as a pseudo-state.
-    pseudo_state = {"lenses_completed": records}
-    fails.extend(check_g3b(pseudo_state))
-    # Transcript slice length per record (G-3a-local equivalent).
-    for i, lens in enumerate(records):
-        slice_ = lens.get("transcript_slice") or []
-        if not isinstance(slice_, list) or len(slice_) < 3:
-            lens_id = lens.get("lens_id", f"<index {i}>")
-            fails.append(
-                f"PARTIAL FAIL: group {gid} lens {lens_id} transcript_slice length "
-                f"{len(slice_) if isinstance(slice_, list) else 'N/A'} < 3"
-            )
-    # Group spawn count sanity.
-    gsc = partial.get("group_spawn_count", 0)
-    if records and gsc < 2 * len(records):
-        fails.append(
-            f"PARTIAL FAIL: group {gid} group_spawn_count={gsc} < 2 * len(lens_records)={2 * len(records)} "
-            f"(each completed lens requires ≥1 Reviewer + ≥1 Author spawn)"
-        )
-    return fails
-
-
-def check_merge_consistency(state: dict, partials: list[dict]) -> list[str]:
-    """Validate that the merged state.json is consistent with its 3 source partials."""
-    fails: list[str] = []
-    if len(partials) != 3:
-        fails.append(f"MERGE FAIL: expected 3 partials, got {len(partials)}")
-    # Collect lens_ids from partials and state.
-    partial_ids: list[int] = []
-    for p in partials:
-        gid = p.get("group_id")
-        for lens in p.get("lens_records") or []:
-            lid = lens.get("lens_id")
-            if lid is not None:
-                partial_ids.append(lid)
-    state_ids = [l.get("lens_id") for l in state.get("lenses_completed") or []]
-    # No duplicates across partials.
-    if len(partial_ids) != len(set(partial_ids)):
-        seen: set = set()
-        dupes = [x for x in partial_ids if x in seen or seen.add(x)]
-        fails.append(f"MERGE FAIL: duplicate lens_ids across partials: {sorted(set(dupes))}")
-    # Merged state covers every partial lens_id (and nothing extra).
-    if sorted(partial_ids) != sorted(state_ids):
-        fails.append(
-            f"MERGE FAIL: partial lens_ids {sorted(partial_ids)} != "
-            f"state.lenses_completed lens_ids {sorted(state_ids)}"
-        )
-    # If every partial is complete (not aborted), all 9 lens_ids (0-8) must be present, assuming full depth.
-    all_complete = all(not p.get("aborted", False) for p in partials)
-    if all_complete:
-        # Consider only lens_ids in active plan (depth > 0).
-        plan = state.get("lens_plan") or []
-        active_ids = sorted(l.get("lens_id") for l in plan if (l.get("depth") or 0) > 0)
-        if sorted(state_ids) != active_ids:
-            fails.append(
-                f"MERGE FAIL: all partials complete but state.lenses_completed lens_ids "
-                f"{sorted(state_ids)} != active plan lens_ids {active_ids}"
-            )
-    # group_spawn_count sum consistency.
-    sum_gsc = sum(p.get("group_spawn_count", 0) for p in partials)
-    sc = state.get("spawn_count", 0)
-    # Expected: state.spawn_count >= sum_gsc + 3 (3 for group-agent dispatches) + any pre-Phase-3 spawns (Phase 2a classification).
-    if sc < sum_gsc + 3:
-        fails.append(
-            f"MERGE FAIL: state.spawn_count={sc} < sum(group_spawn_count)={sum_gsc} + 3 (group dispatches). "
-            f"Moderator folded counts incorrectly."
-        )
-    return fails
+# Legacy group-partial and merge-consistency check functions (check_partial_group,
+# check_merge_consistency) were removed in the 2026-04-24 flat-dispatch refactor.
+# Nested subagent dispatch is architecturally impossible in Claude Code, so the 3×3
+# group architecture they validated cannot exist. See
+# quality_reports/plans/2026-04-24_paper-stress-test-flat-dispatch.md.
 
 
 def validate(state_path: Path) -> int:
@@ -323,7 +413,17 @@ def validate(state_path: Path) -> int:
         print(f"FATAL: cannot load {state_path}: {exc}", file=sys.stderr)
         return 2
     all_fails: list[str] = []
-    for check in (check_g3a, check_g3b, check_g3c, check_g4a, check_g5a):
+    for check in (
+        check_g3a,
+        check_g3b,
+        check_g3c,
+        check_g3_schema,
+        check_g3_model,
+        check_g3_notebook,
+        check_g3_mod_content,
+        check_g4a,
+        check_g5a,
+    ):
         all_fails.extend(check(state))
     if all_fails:
         print(f"\n{state_path.name}: {len(all_fails)} gate violation(s)\n")
@@ -335,48 +435,9 @@ def validate(state_path: Path) -> int:
     return 0
 
 
-def validate_partial(partial_path: Path) -> int:
-    try:
-        partial = json.loads(partial_path.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"FATAL: cannot load {partial_path}: {exc}", file=sys.stderr)
-        return 2
-    fails = check_partial_group(partial)
-    if fails:
-        print(f"\n{partial_path.name}: {len(fails)} partial-group violation(s)\n")
-        for line in fails:
-            print(f"  {line}")
-        print()
-        return 1
-    print(f"{partial_path.name}: OK (partial group gates pass)")
-    return 0
-
-
-def validate_merge(state_path: Path, partial_paths: list[Path]) -> int:
-    try:
-        state = json.loads(state_path.read_text())
-        partials = [json.loads(p.read_text()) for p in partial_paths]
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"FATAL: cannot load inputs: {exc}", file=sys.stderr)
-        return 2
-    fails = check_merge_consistency(state, partials)
-    if fails:
-        print(f"\nmerge check ({state_path.name} vs {len(partials)} partials): {len(fails)} violation(s)\n")
-        for line in fails:
-            print(f"  {line}")
-        print()
-        return 1
-    print(f"merge check OK: {state_path.name} consistent with {len(partials)} partials")
-    return 0
-
-
 def main(argv: list[str]) -> int:
     if len(argv) == 2:
         return validate(Path(argv[1]))
-    if len(argv) == 3 and argv[1] == "--partial-group":
-        return validate_partial(Path(argv[2]))
-    if len(argv) == 6 and argv[1] == "--check-merge":
-        return validate_merge(Path(argv[2]), [Path(p) for p in argv[3:6]])
     print(__doc__, file=sys.stderr)
     return 2
 
