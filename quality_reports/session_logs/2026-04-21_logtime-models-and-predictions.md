@@ -110,3 +110,92 @@ affected, but local smoke tests and any OneDrive-synced checkout were.
    dataframes.
 3. Targeted re-run with `SAVE_FULL_MODELS=true SEED=<median>` to pickle
    fitted model objects for PDP/ALE/SHAP interpretability work.
+
+---
+
+## 2026-04-24 — Cluster run 44879214 postmortem + OOM fix
+
+## What happened
+
+User checked progress ~60h after submission. Actual state was much worse
+than "some scenarios finished":
+
+| Array | Scenario | Final | Elapsed | Seeds | Notes |
+|---|---|---|---|---|---|
+| _0 | MCAR_10pct | **OOM** | 31h | 46/500 | MaxRSS 209 GB / 200 GB limit |
+| _1 | MCAR_20pct | **OOM** | 38h | 46/500 | same |
+| _2 | MCAR_30pct | CANCELLED | 45h | 3/500 | stuck, workers dying off |
+| _3 | MCAR_50pct | **OOM** | 35h | 55/500 | same |
+| _4 | MAR_10pct | CANCELLED | 31h | 3/500 | stuck |
+| _5 | MAR_20pct | CANCELLED | 30h | 1/500 | stuck |
+| _6, _7 | MAR_30/50pct | CANCELLED | — | — | never ran |
+
+All three OOM tasks terminated at MaxRSS ≈ 209 GB within chunk 1/8.
+No chunk checkpoint (temp_*/) ever saved. Other 6 methods
+(44879215–44879220) were cancelled from queue before starting.
+~12,400 CPU-hours of wasted compute. 196 partial prediction RDS + 196
+summaries + 6 manifests survive on `/work/users/y/u/yumeiy/missing types/`.
+
+## Root-cause analysis
+
+Applied `/systematic-debugging` skill.
+
+**Not a rep-to-rep leak.** Each PSOCK worker does exactly ONE rep per
+chunk (chunk_size=64 × 1 rep each = 64 seeds per chunk). Cluster is
+destroyed + recreated between chunks (`stopCluster(cl); rm(cl);
+aggressive_gc()` at [simulation_engine.R:427]). No seed-to-seed
+accumulation path exists.
+
+**Not a parent leak.** `[MEMORY PRE-SIMULATION] 0.03 GB`, result list
+contains only scalars.
+
+**Actual cause: memory oversubscription.** Each worker, fitting all 7
+prediction models at n=500, holds simultaneously:
+- landmark-expanded transformed_data (O(n²) rows)
+- RF ×2, Cox ×1, MERFranger ×3, GRF ×3 — forest objects stay referenced
+  until `run_comprehensive_simulation` returns (no intra-fn `rm()`s)
+- pred_entries + pred_long from SAVE_PREDICTIONS (~10-20 MB)
+
+Rough per-worker peak: 3-4 GB. × 64 workers = **192-256 GB aggregate**,
+right at/over the 200 GB cgroup limit. SAVE_PREDICTIONS (Tasks 7-9)
+added ~20-40 MB per worker — small but enough to tip an already-edge
+simulation over. Stuck tasks _2/_4/_5 didn't fully OOM-terminate; cgroup
+killed individual workers and survivors crawled forward at 1-3
+seeds/30-45h.
+
+## Fix (commit b05093e)
+
+Halved both parameters across all 7 submit scripts:
+- `#SBATCH --cpus-per-task=64` → `32`
+- `export CHUNK_SIZE="${CHUNK_SIZE:-64}"` → `${CHUNK_SIZE:-32}`
+
+Keeps `CHUNK_SIZE == --cpus-per-task` (CLAUDE.md rule). Expected
+aggregate peak: ~100-130 GB (70+ GB headroom). Wall time per scenario
+~105h → ~210h (inside 240h limit).
+
+Also applied bonus fix `d144871` from earlier today to
+`simulation_engine.R` — git_commit capture via setwd() rather than
+`system2("git", "-C", <path-with-space>)`. This was a prerequisite to
+the stricter Task 10.5 manifest checks and was needed anyway for the
+cluster where the workdir is `/work/users/y/u/yumeiy/missing types/`.
+
+## Verification plan
+
+Test job: `sbatch --array=6 submit_missing_types_cca.sh` → job
+**45542874_6** (`missing_MAR_30pct_complete_case`, zero prior output,
+clean signal).
+
+Success criteria:
+- No `oom_kill` events in SLURM stderr
+- First chunk (32 seeds) completes in ~13-15h
+- `sacct MaxRSS` stays under ~140 GB
+- 32 prediction RDS written to `results_missing_types/predictions/`
+
+If test passes → rsync + resubmit remaining 7 CCA scenarios + other 6
+methods. If test fails → hypothesis H1 is wrong, hunt for real leak
+(surgical `rm()` + `gc()` calls inside `run_comprehensive_simulation`).
+
+## Files touched this pass
+
+- `Missing Types/submit_missing_types_*.sh` (×7) — chunk size 64 → 32
+- Rsync to `/work/users/y/u/yumeiy/missing types/` on Longleaf
