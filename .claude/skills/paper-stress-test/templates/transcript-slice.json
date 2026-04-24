@@ -1,0 +1,54 @@
+{
+  "_description": "Canonical transcript_slice exemplar. EVERY turn_record MUST have exactly these top-level keys, with the same types. Validated against schema/state.schema.json#/definitions/turn_record. Gate G-3c rejects any record with legacy keys (turn, close_lens_mode, action, novelty_seed, notebook_id, query, result_summary, result_verbatim, moderator_notebook_query, moderator_thematic_query, moderator_notebook_proxy, moderator_direct) at the record level. Notebook consultation findings belong INSIDE the content field, not as a separate role or field.",
+
+  "_exemplar_reviewer_turn": {
+    "role": "reviewer",
+    "round": 1,
+    "content": "QUESTION: The paper assumes i.i.d. features in [0,1]^d ... how does the paper justify applying causal forests to non-uniform, correlated covariate distributions?",
+    "timestamp_iso": "2026-04-23T20:33:43Z",
+    "lens_id": 0,
+    "model": "opus",
+    "notebooks_granted": ["569460ee-98b4-48d1-820d-63af9f8b03e9"]
+  },
+
+  "_exemplar_author_turn": {
+    "role": "author",
+    "round": 1,
+    "content": "ANSWER: The paper acknowledges this concern ...\n\nCITATIONS:\n- 'The result also holds with a density that is bounded away from [zero] and infinity' — Section 3.1, footnote to Theorem 3.1",
+    "timestamp_iso": "2026-04-23T20:34:30Z",
+    "lens_id": 0,
+    "model": "sonnet",
+    "notebooks_granted": ["569460ee-98b4-48d1-820d-63af9f8b03e9"]
+  },
+
+  "_exemplar_moderator_turn": {
+    "role": "moderator",
+    "round": 1,
+    "content": "Signal: converging. Author produced an honest retrieval ... lens closes at minor severity.",
+    "timestamp_iso": "2026-04-23T20:34:50Z",
+    "lens_id": 0,
+    "model": "opus",
+    "notebooks_granted": []
+  },
+
+  "_exemplar_lens7_reviewer_turn": {
+    "_note": "Lens 7 only: the Reviewer is granted the thematic notebook (I-5). The thematic-notebook findings are concatenated into content, not emitted as a separate turn. role is still 'reviewer' — never 'moderator_thematic_query' or any other drift value.",
+    "role": "reviewer",
+    "round": 1,
+    "content": "QUESTION: Mentch & Hooker (2016) proved asymptotic normality via U-statistic representation ...\n\nTHEMATIC_FINDINGS: Query to thematic notebook 'ML for Recurrent Events' returned: pseudo-observation forests and causal forests both rely on centered asymptotic normality and honesty-analogous conditions ... (verbatim: 'The V_IJ assumes i.i.d. data; extensions to survival require IPCW adjustments.')",
+    "timestamp_iso": "2026-04-23T20:35:00Z",
+    "lens_id": 7,
+    "model": "opus",
+    "notebooks_granted": ["0bf80af5-8b8d-423d-b7ef-94b13ad48f7b", "569460ee-98b4-48d1-820d-63af9f8b03e9"]
+  },
+
+  "_forbidden_shapes": {
+    "_note": "These shapes are REJECTED by gate G-3c. Do not emit them.",
+    "bad_turn_field": {"turn": 2, "role": "reviewer", "content": "..."},
+    "bad_notebook_query_role": {"role": "moderator_notebook_query", "notebook_id": "...", "query": "..."},
+    "bad_thematic_query_role": {"role": "moderator_thematic_query", "notebook_id": "...", "query": "..."},
+    "bad_proxy_model": {"role": "author", "model": "moderator_notebook_proxy", "content": "..."},
+    "bad_close_lens_mode": {"role": "reviewer", "close_lens_mode": true, "content": "..."},
+    "bad_action_stub": {"role": "moderator", "action": "novelty_seed_built", "novelty_seed": "..."}
+  }
+}

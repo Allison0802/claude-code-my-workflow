@@ -1,0 +1,296 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://unc.edu/paper-stress-test/state.schema.json",
+  "title": "paper-stress-test state.json",
+  "description": "Authoritative schema for the paper-stress-test skill's state.json artifact. schema_version=2 forbids the legacy Group-2 drift shapes (turn, close_lens_mode, moderator_notebook_query, moderator_thematic_query, moderator_notebook_proxy, action, novelty_seed at record level).",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "paper",
+    "invocation",
+    "notebooks",
+    "detected_type",
+    "classification_source",
+    "headline_claim",
+    "novelty_claims",
+    "novelty_check",
+    "lens_plan",
+    "lenses_completed",
+    "synthesis",
+    "transcript",
+    "moderator_assessments",
+    "spawn_count",
+    "spawn_budget",
+    "wall_clock_start",
+    "wall_clock_budget_s",
+    "run_status",
+    "started_at",
+    "completed_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["2"],
+      "description": "Bumped to 2 in the 2026-04-23 refactor. Runs with schema_version=1 are grandfathered and flagged by the auditor script."
+    },
+    "paper": {
+      "type": "object",
+      "required": ["title", "authors", "year", "source", "slug"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "authors": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "year": { "type": "integer", "minimum": 1900, "maximum": 2100 },
+        "source": { "type": "string", "minLength": 1 },
+        "slug": { "type": "string", "pattern": "^[a-z0-9_]+_\\d{4}-\\d{2}-\\d{2}$" }
+      },
+      "additionalProperties": false
+    },
+    "invocation": {
+      "type": "object",
+      "required": ["depth", "type_override", "cross_check_override", "skip_novelty", "human_checkpoint"],
+      "properties": {
+        "depth": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "type_override": { "type": ["string", "null"] },
+        "cross_check_override": { "type": ["string", "null"] },
+        "skip_novelty": { "type": "boolean" },
+        "human_checkpoint": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "notebooks": {
+      "type": "object",
+      "required": ["disposable", "thematic"],
+      "properties": {
+        "disposable": {
+          "type": "object",
+          "required": ["id", "name", "created_at", "disposition", "promoted_to"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "name": { "type": "string", "minLength": 1 },
+            "created_at": { "type": "string", "format": "date-time" },
+            "disposition": {
+              "type": "string",
+              "enum": ["pending", "deleted", "kept", "promoted"],
+              "description": "Must be != 'pending' when run_status == 'completed' (gate G-3f)."
+            },
+            "promoted_to": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "thematic": {
+          "type": "object",
+          "required": ["id", "name"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "name": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "detected_type": { "type": "string", "minLength": 1 },
+    "classification_source": {
+      "type": "string",
+      "enum": ["reviewer", "user_override", "auto_keyword"]
+    },
+    "headline_claim": { "type": "string", "minLength": 1 },
+    "novelty_claims": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "novelty_check": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "running", "completed", "failed", "skipped"] },
+        "runner_agent_id": { "type": ["string", "null"] },
+        "started_at": { "type": ["string", "null"] },
+        "completed_at": { "type": ["string", "null"] },
+        "overall_score": { "type": ["number", "null"], "minimum": 0, "maximum": 10 },
+        "recommendation": {
+          "type": ["string", "null"],
+          "description": "Free-text recommendation label from the novelty-check skill. Common values include PROCEED, PROCEED WITH CAUTION, CAUTION, REDIRECT, STOP, ABANDON. Not enum-constrained because novelty-check output evolves."
+        },
+        "key_differentiator": { "type": ["string", "null"] },
+        "closest_prior_work": {
+          "type": "array",
+          "description": "Prior-work entries from novelty-check. Field names vary (paper vs authors vs title) because novelty-check output is not schema-pinned; we accept whatever comes back and let downstream readers normalize.",
+          "items": {
+            "type": "object"
+          }
+        },
+        "raw_report_md": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "lens_plan": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {
+        "type": "object",
+        "required": ["lens_id", "name", "weight", "depth"],
+        "properties": {
+          "lens_id": { "type": "integer", "minimum": 0, "maximum": 8 },
+          "name": {
+            "type": "string",
+            "enum": ["data", "estimand", "identification", "methodology", "overclaims", "alternatives", "generalizability", "positioning", "reproducibility"]
+          },
+          "weight": { "type": "string", "enum": ["heavy", "medium", "light"] },
+          "depth": { "type": "integer", "minimum": 1, "maximum": 3 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "lenses_completed": {
+      "type": "array",
+      "maxItems": 9,
+      "items": { "$ref": "#/definitions/lens_record" }
+    },
+    "synthesis": {
+      "type": "object",
+      "required": ["verdict", "top_killer_questions", "subproject_relevance", "recommendation", "recommendation_rationale"],
+      "properties": {
+        "verdict": { "type": "string", "minLength": 1 },
+        "top_killer_questions": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "required": ["question", "lens_id", "lens_name", "severity", "why_it_matters"],
+            "properties": {
+              "question": { "type": "string" },
+              "lens_id": { "type": "integer", "minimum": 0, "maximum": 8 },
+              "lens_name": { "type": "string" },
+              "severity": { "$ref": "#/definitions/severity" },
+              "why_it_matters": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "subproject_relevance": { "type": "object" },
+        "recommendation": { "type": "string", "enum": ["cite", "build-on", "flag", "skip"] },
+        "recommendation_rationale": { "type": "string" },
+        "severity_tally": {
+          "type": "object",
+          "description": "Optional summary count of lens severities (critical/major/minor/clean/skipped). Populated by the live skill; drives the recommendation rule.",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "transcript": {
+      "type": "array",
+      "description": "Root transcript is a flat list of turns across all lenses. Every element must be a full turn record — no stubs.",
+      "items": { "$ref": "#/definitions/turn_record" }
+    },
+    "moderator_assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["lens_id", "round", "content", "timestamp_iso"],
+        "properties": {
+          "lens_id": { "type": "integer", "minimum": 0, "maximum": 8 },
+          "round": { "type": "integer", "minimum": 1 },
+          "content": { "type": "string", "minLength": 1 },
+          "timestamp_iso": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false,
+        "description": "Content must be non-empty. Empty stubs {round: null, content: '', timestamp_iso: ''} are rejected (gate G-3e)."
+      }
+    },
+    "compaction_history": { "type": "array" },
+    "spawn_count": { "type": "integer", "minimum": 0 },
+    "spawn_budget": { "type": "integer", "minimum": 1 },
+    "wall_clock_start": { "type": "string", "format": "date-time" },
+    "wall_clock_budget_s": { "type": "integer", "minimum": 1 },
+    "abort_reason": { "type": ["string", "null"] },
+    "moderator_own_context_est_chars": { "type": "integer", "minimum": 0 },
+    "run_status": {
+      "type": "string",
+      "enum": ["initializing", "in_progress", "completed", "aborted", "failed"]
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false,
+
+  "definitions": {
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "major", "minor", "clean", "skipped"]
+    },
+    "evidence": {
+      "type": "string",
+      "enum": ["present", "absent", "partial", "unavailable"]
+    },
+    "role": {
+      "type": "string",
+      "enum": ["reviewer", "author", "moderator"],
+      "description": "Bright-line role enumeration. Legacy values (moderator_notebook_query, moderator_thematic_query, moderator_notebook_proxy, moderator_direct, moderator_notebook_proxy_author) are rejected. Notebook consultation happens INSIDE a role's content field, not as a new role."
+    },
+    "model_string": {
+      "type": "string",
+      "pattern": "^(opus|sonnet|haiku)(-[a-z0-9-]+)?$",
+      "description": "Must be one of 'opus', 'sonnet', or 'haiku' (optionally with a suffix). Values like 'moderator_notebook_proxy' are rejected."
+    },
+    "turn_record": {
+      "type": "object",
+      "required": ["role", "round", "content", "timestamp_iso", "lens_id"],
+      "properties": {
+        "role": { "$ref": "#/definitions/role" },
+        "round": { "type": "integer", "minimum": 1 },
+        "content": { "type": "string", "minLength": 1 },
+        "timestamp_iso": { "type": "string", "format": "date-time" },
+        "lens_id": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "model": { "$ref": "#/definitions/model_string" },
+        "notebooks_granted": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Notebook ids this subagent was given access to in its prompt. Used by gate G-3d-bis to enforce role-notebook isolation (I-5): Author must NOT have thematic_notebook_id here."
+        }
+      },
+      "additionalProperties": false
+    },
+    "lens_record": {
+      "type": "object",
+      "required": [
+        "lens_id",
+        "name",
+        "severity",
+        "one_line_finding",
+        "evidence",
+        "author_best_defense",
+        "summary_for_compaction",
+        "moderator_signals",
+        "transcript_slice",
+        "why_it_didnt_hold"
+      ],
+      "properties": {
+        "lens_id": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "name": { "type": "string" },
+        "severity": { "$ref": "#/definitions/severity" },
+        "one_line_finding": { "type": "string" },
+        "evidence": { "$ref": "#/definitions/evidence" },
+        "author_best_defense": { "type": ["string", "null"] },
+        "summary_for_compaction": { "type": "string" },
+        "moderator_signals": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "description": "Array of moderator-written analytical notes or signal labels. Free text is permitted (moderator may merge signal + reasoning into one entry). Empty strings are rejected."
+        },
+        "transcript_slice": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "$ref": "#/definitions/turn_record" }
+        },
+        "why_it_didnt_hold": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false,
+      "description": "A closed lens. transcript_slice items MUST match turn_record exactly — no 'turn', no 'close_lens_mode', no 'action', no 'novelty_seed', no 'notebook_id/query/result_summary/result_verbatim' at the record level (gate G-3c). Notebook findings, if present, go inside content."
+    }
+  }
+}
